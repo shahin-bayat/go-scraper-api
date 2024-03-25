@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"go-scraper-api/internal/server"
+
+	"github.com/shahin-bayat/scraper-api/internal/server"
 )
 
 func main() {

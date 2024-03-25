@@ -1,11 +1,12 @@
 package tests
 
 import (
-	"go-scraper-api/internal/server"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/shahin-bayat/scraper-api/internal/server"
 )
 
 func TestHandler(t *testing.T) {
