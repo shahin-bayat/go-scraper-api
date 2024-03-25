@@ -1,24 +1,15 @@
-package database
+package store
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/joho/godotenv/autoload"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
-
-type Service interface {
-	Health() map[string]string
-}
-
-type service struct {
-	db *sql.DB
-}
 
 var (
 	database = os.Getenv("DB_DATABASE")
@@ -28,17 +19,22 @@ var (
 	host     = os.Getenv("DB_HOST")
 )
 
-func New() Service {
+type postgresStore struct {
+	db *sqlx.DB
+}
+
+func New() Store {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, database)
-	db, err := sql.Open("pgx", connStr)
+	db, err := sqlx.Connect("postgres", connStr)
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := &service{db: db}
+	s := &postgresStore{db: db}
 	return s
 }
 
-func (s *service) Health() map[string]string {
+func (s *postgresStore) Health() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 

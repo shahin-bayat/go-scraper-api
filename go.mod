@@ -1,11 +1,13 @@
-module go-scraper-api
+module github.com/shahin-bayat/scraper-api
 
 go 1.22.0
 
 require (
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/jackc/pgx/v5 v5.5.5
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/joho/godotenv v1.5.1
+	github.com/lib/pq v1.2.0
 )
 
 require (
