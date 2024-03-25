@@ -1,12 +1,11 @@
-package store
+package ecosystem
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
-	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -19,31 +18,12 @@ var (
 	host     = os.Getenv("DB_HOST")
 )
 
-type postgresStore struct {
-	db *sqlx.DB
-}
-
-func New() Store {
+func (e *ecosystem) requireDB() *sqlx.DB {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, database)
 	db, err := sqlx.Connect("postgres", connStr)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := &postgresStore{db: db}
-	return s
-}
-
-func (s *postgresStore) Health() map[string]string {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	err := s.db.PingContext(ctx)
-	if err != nil {
-		log.Fatalf(fmt.Sprintf("db down: %v", err))
-	}
-
-	return map[string]string{
-		"message": "It's healthy",
-	}
+	return db
 }

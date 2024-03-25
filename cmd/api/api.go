@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 
+	"github.com/shahin-bayat/scraper-api/internal/ecosystem"
 	"github.com/shahin-bayat/scraper-api/internal/server"
 )
 
 func main() {
+	eco := ecosystem.Require()
 
-	server := server.NewServer()
+	server := server.Create(eco)
 
 	err := server.ListenAndServe()
 	if err != nil {
