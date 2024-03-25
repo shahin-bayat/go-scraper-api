@@ -1,3 +1,6 @@
+-- +goose Up
+-- +goose StatementBegin
+SELECT 'up SQL query';
 CREATE TABLE
   IF NOT EXISTS questions (
     id SERIAL PRIMARY KEY,
@@ -10,3 +13,10 @@ CREATE TABLE
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP 
   );
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+SELECT 'down SQL query';
+DROP TABLE IF EXISTS questions;
+-- +goose StatementEnd
