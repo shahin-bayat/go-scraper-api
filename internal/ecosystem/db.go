@@ -20,6 +20,9 @@ var (
 
 func (e *ecosystem) requireDB() *sqlx.DB {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, database)
+	if os.Getenv("DB_INTERNAL_URL") != "" {
+		connStr = os.Getenv("DB_INTERNAL_URL")
+	}
 	db, err := sqlx.Connect("postgres", connStr)
 
 	if err != nil {
