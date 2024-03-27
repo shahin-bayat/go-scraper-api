@@ -59,14 +59,35 @@ watch:
 
 .PHONY: all build run test clean
 
+# Migrations
+backup-dev:
+	@pg_dump $$DEV_DATABASE_URL -W -Ft > ./migrations/backup/backup_`date +%s`.dev.dump
+
+backup-prod:
+	@pg_dump $$PROD_DATABASE_URL -W -Ft > ./migrations/backup/backup_`date +%s`.prod.dump
+
 goose-up:
+	@echo "Migrating database..."
 	@goose -dir ./migrations postgres "host=$$DB_HOST user=$$DB_USERNAME dbname=$$DB_DATABASE password=$$DB_PASSWORD port=$$DB_PORT sslmode=disable" up
+	@goose -dir ./migrations postgres $$DEV_DATABASE_URL up
+	@goose -dir ./migrations postgres $$PROD_DATABASE_URL up
+	@echo "Migration complete"
 
 goose-down:
+	@echo "Migrating database..."
 	@goose -dir ./migrations postgres "host=$$DB_HOST user=$$DB_USERNAME dbname=$$DB_DATABASE password=$$DB_PASSWORD port=$$DB_PORT sslmode=disable" down
+	@goose -dir ./migrations postgres $$DEV_DATABASE_URL down
+	@goose -dir ./migrations postgres $$PROD_DATABASE_URL down
+	@echo "Migration complete"
 
 goose-status:
+	@echo "Local Status of Migrations"
 	@goose -dir ./migrations postgres "host=$$DB_HOST user=$$DB_USERNAME dbname=$$DB_DATABASE password=$$DB_PASSWORD port=$$DB_PORT sslmode=disable" status
+	@echo "Develop Status of Migrations"
+	@goose -dir ./migrations postgres $$DEV_DATABASE_URL status
+	@echo "Production Status of Migrations"
+	@goose -dir ./migrations postgres $$PROD_DATABASE_URL status
+
 
 goose-create:
 	@read -p "Enter migration name: " NAME; \
