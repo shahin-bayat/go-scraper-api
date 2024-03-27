@@ -32,5 +32,4 @@ main
 migrations/backup/*.sql
 migrations/backup/*.dump
 
-# Assets
 assets/
