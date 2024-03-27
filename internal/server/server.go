@@ -7,17 +7,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/shahin-bayat/scraper-api/internal/ecosystem"
-
+	"github.com/jmoiron/sqlx"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/shahin-bayat/scraper-api/internal/store"
 )
 
-func Create(eco ecosystem.Ecosystem) *http.Server {
+func Create(db *sqlx.DB) *http.Server {
+
+	store := store.New(db)
+
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 
 	return &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
-		Handler:      RegisterRoutes(eco),
+		Handler:      RegisterRoutes(store),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,

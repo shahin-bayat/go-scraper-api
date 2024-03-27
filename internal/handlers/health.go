@@ -1,35 +1,36 @@
 package handlers
 
 import (
-	"context"
+	"database/sql"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"time"
-
-	"github.com/shahin-bayat/scraper-api/internal/ecosystem"
 )
 
-func HealthHandler(eco ecosystem.Ecosystem) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		resp := make(map[string]string)
-		resp["message"] = "Server is up and running."
+func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
+	healthStatus := make(map[string]string)
 
-		jsonResp, err := json.Marshal(resp)
-		if err != nil {
-			log.Fatalf("error handling JSON marshal. Err: %v", err)
+	// Check database health
+	if err := h.store.HealthRepository().HealthCheck(r.Context()); err != nil {
+		if err == sql.ErrConnDone { // Check if database connection is closed
+			healthStatus["database"] = "error: database connection closed"
+		} else {
+			healthStatus["database"] = "error: " + err.Error()
 		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-
-		err = eco.DB().PingContext(ctx)
-		if err != nil {
-			log.Fatalf(fmt.Sprintf("db down: %v", err))
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(jsonResp)
+	} else {
+		healthStatus["database"] = "ok"
 	}
+
+	// Add more health checks as needed
+
+	// Marshal health status to JSON
+	response, err := json.Marshal(healthStatus)
+	if err != nil {
+		http.Error(w, "Failed to marshal health status", http.StatusInternalServerError)
+		return
+	}
+
+	// Set response headers and write JSON response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(response)
 }
