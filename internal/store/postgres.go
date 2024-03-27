@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"os"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -22,6 +23,9 @@ func NewPostgresStore() (*sqlx.DB, error) {
 	if os.Getenv("DB_INTERNAL_URL") != "" {
 		connStr = os.Getenv("DB_INTERNAL_URL")
 	}
+	// to fix the issue with railway app : https://docs.railway.app/guides/private-networking#initialization-time
+	time.Sleep(3 * time.Second)
+
 	db, err := sqlx.Connect("postgres", connStr)
 
 	if err != nil {
