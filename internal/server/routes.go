@@ -5,15 +5,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/shahin-bayat/scraper-api/internal/ecosystem"
+
 	"github.com/shahin-bayat/scraper-api/internal/handlers"
+	"github.com/shahin-bayat/scraper-api/internal/store"
 )
 
-func RegisterRoutes(eco ecosystem.Ecosystem) http.Handler {
+func RegisterRoutes(store store.Store) http.Handler {
 	r := chi.NewRouter()
+	handlers := handlers.New(store)
+
 	r.Use(middleware.Logger)
 
-	r.Get("/health", handlers.HealthHandler(eco))
+	r.Get("/health", handlers.HealthHandler)
 
 	return r
 }

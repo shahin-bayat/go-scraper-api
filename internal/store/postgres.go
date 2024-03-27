@@ -1,8 +1,7 @@
-package ecosystem
+package store
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -18,7 +17,7 @@ var (
 	host     = os.Getenv("DB_HOST")
 )
 
-func (e *ecosystem) requireDB() *sqlx.DB {
+func NewPostgresStore() (*sqlx.DB, error) {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, database)
 	if os.Getenv("DB_INTERNAL_URL") != "" {
 		connStr = os.Getenv("DB_INTERNAL_URL")
@@ -26,7 +25,10 @@ func (e *ecosystem) requireDB() *sqlx.DB {
 	db, err := sqlx.Connect("postgres", connStr)
 
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	return db
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+	return db, nil
 }
