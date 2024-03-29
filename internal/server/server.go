@@ -23,7 +23,7 @@ func Create(db *sqlx.DB) (*http.Server, error) {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 
 	return &http.Server{
-		Addr:         fmt.Sprintf("127.0.0.1:%d", port),
+		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      RegisterRoutes(store, config),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
