@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/shahin-bayat/scraper-api/internal/server"
@@ -15,11 +14,11 @@ func main() {
 	}
 	defer db.Close()
 
-	server := server.Create(db)
-
-	err = server.ListenAndServe()
-
+	server, err := server.Create(db)
 	if err != nil {
-		panic(fmt.Sprintf("cannot start server: %s", err))
+		log.Fatalf("Failed to create server: %v", err)
 	}
+
+	log.Fatal(server.ListenAndServe())
+
 }
