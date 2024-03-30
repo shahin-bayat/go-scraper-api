@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/shahin-bayat/scraper-api/internal/utils"
@@ -11,18 +10,14 @@ import (
 
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	verifier := oauth2.GenerateVerifier()
-	// generate a random string for state
 	state, err := utils.GenerateRandomString(32)
 	if err != nil {
 		http.Error(w, "Failed to generate random string", http.StatusInternalServerError)
 		return
 	}
-
-	setSession(w, r, "verifier", verifier)
-	setSession(w, r, "state", state)
-
+	utils.SetSession(w, r, "verifier", verifier)
+	utils.SetSession(w, r, "state", state)
 	url := h.config.OAuth2Config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier))
-	fmt.Printf("Visit the URL for the auth dialog: %v", url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
@@ -30,12 +25,12 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 
-	if state != getSession(r, "state") {
+	if state != utils.GetSession(r, "state") {
 		http.Error(w, "State mismatch", http.StatusBadRequest)
 		return
 	}
 
-	verifier := getSession(r, "verifier")
+	verifier := utils.GetSession(r, "verifier")
 	token, err := h.config.OAuth2Config.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier))
 	if err != nil {
 		http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
@@ -57,25 +52,64 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: use user email or id and check if the user is already in the database
+	// TODO:if the user is not in the database, add the user with access token and refresh token to the database
+	// TODO: if the user is in the database, update the user info, access token and refresh token in the database
+
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Authorization", token.AccessToken)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(userData)
 }
 
-func setSession(w http.ResponseWriter, r *http.Request, key, value string) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     key,
-		Value:    value,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
+func (h *Handler) HandleAuthStatus(w http.ResponseWriter, r *http.Request) {
+	accessToken := r.Header.Get("Authorization")
+	if accessToken == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// validate the access token
+	token, err := h.config.OAuth2Config.TokenSource(r.Context(), &oauth2.Token{
+		AccessToken: accessToken,
+	}).Token()
+	if err != nil {
+		http.Error(w, "Failed to validate token", http.StatusInternalServerError)
+		return
+	}
+
+	if !token.Valid() {
+		// TODO: fetch the user using provided access token
+		// TODO: use the refresh token in the database to get a new access token
+		token, err := h.config.OAuth2Config.TokenSource(r.Context(), &oauth2.Token{
+			// this should be the refresh token saved in the database
+			RefreshToken: token.RefreshToken,
+		}).Token()
+
+		if err != nil {
+			http.Error(w, "Failed to refresh token", http.StatusInternalServerError)
+			return
+		}
+
+		// TODO: save the new refresh token and access token in the database
+		_ = token.RefreshToken
+		w.Header().Set("Authorization", token.AccessToken)
+
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Authorization", token.AccessToken)
+	w.WriteHeader(http.StatusOK)
+
 }
 
-func getSession(r *http.Request, key string) string {
-	session, err := r.Cookie(key)
-	if err != nil {
-		return ""
-	}
-	return session.Value
+func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	utils.ClearSession(w, r, "verifier")
+	utils.ClearSession(w, r, "state")
+	w.WriteHeader(http.StatusOK)
+	// remove the refresh token and access token from the database
+	// redirect to login
+	w.Header().Set("Location", "/auth/login")
+	w.WriteHeader(http.StatusTemporaryRedirect)
+
 }
