@@ -14,7 +14,12 @@ func main() {
 	}
 	defer db.Close()
 
-	server, err := server.Create(db)
+	redis, err := store.NewRedisStore()
+	if err != nil {
+		log.Fatalf("Failed to create Redis store: %v", err)
+	}
+
+	server, err := server.Create(db, redis)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
