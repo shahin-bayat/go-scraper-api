@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"strconv"
 )
 
 func GenerateRandomString(length int) (string, error) {
@@ -20,8 +19,4 @@ func GenerateRandomString(length int) (string, error) {
 
 	// Return the first 'length' characters of the base64 string
 	return randomString[:length], nil
-}
-
-func StringToInt(s string) (int, error) {
-	return strconv.Atoi(s)
 }

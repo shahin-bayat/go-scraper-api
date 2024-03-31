@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
@@ -24,7 +25,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("category id is required"))
 		return
 	}
-	uintCategoryId, err := utils.StringToInt(categoryId)
+	uintCategoryId, err := strconv.Atoi(categoryId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
