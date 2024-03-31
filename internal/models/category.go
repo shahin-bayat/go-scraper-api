@@ -14,5 +14,6 @@ type Category struct {
 }
 
 type CategoryDetailResponse struct {
-	QuestionsCount int `json:"questions_count"`
+	QuestionNumber string `json:"question_number" db:"question_number"`
+	QuestionId     int    `json:"question_id" db:"id"`
 }
