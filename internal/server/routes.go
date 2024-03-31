@@ -26,5 +26,13 @@ func RegisterRoutes(store store.Store, config *config.Config) http.Handler {
 	r.Get("/auth/google/callback", handlers.HandleCallback)
 	r.Get("/auth/logout", handlers.HandleLogout)
 
+	r.Route("/api/v1", func(r chi.Router) {
+		// r.Use(handlers.AuthMiddleware)
+		r.Route("/category", func(r chi.Router) {
+			r.Get("/", handlers.GetCategories)
+			r.Get("/{categoryId}/question/{questionNumber}", nil)
+		})
+	})
+
 	return r
 }

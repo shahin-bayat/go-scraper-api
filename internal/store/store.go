@@ -9,13 +9,15 @@ import (
 type Store interface {
 	UserRepository() *repositories.UserRepository
 	HealthRepository() *repositories.HealthRepository
+	CategoryRepository() *repositories.CategoryRepository
 }
 
 type store struct {
-	db               *sqlx.DB
-	redis            *redis.Client
-	userRepository   *repositories.UserRepository
-	healthRepository *repositories.HealthRepository
+	db                 *sqlx.DB
+	redis              *redis.Client
+	userRepository     *repositories.UserRepository
+	healthRepository   *repositories.HealthRepository
+	categoryRepository *repositories.CategoryRepository
 }
 
 func New(db *sqlx.DB, redis *redis.Client) Store {
@@ -38,4 +40,11 @@ func (e *store) HealthRepository() *repositories.HealthRepository {
 		e.healthRepository = repositories.NewHealthRepository(e.db, e.redis)
 	}
 	return e.healthRepository
+}
+
+func (e *store) CategoryRepository() *repositories.CategoryRepository {
+	if e.categoryRepository == nil {
+		e.categoryRepository = repositories.NewCategoryRepository(e.db)
+	}
+	return e.categoryRepository
 }
