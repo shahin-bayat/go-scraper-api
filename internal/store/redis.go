@@ -23,7 +23,6 @@ func NewRedisStore() (*redis.Client, error) {
 	if os.Getenv("REDIS_INTERNAL_URL") != "" {
 		connStr = os.Getenv("REDIS_INTERNAL_URL")
 	}
-	fmt.Printf("connStr: %s\n", connStr)
 	opt, err := redis.ParseURL(connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse redis url: %w", err)
