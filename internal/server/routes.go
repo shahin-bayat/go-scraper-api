@@ -30,6 +30,7 @@ func RegisterRoutes(store store.Store, config *config.Config) http.Handler {
 		// r.Use(handlers.AuthMiddleware)
 		r.Route("/category", func(r chi.Router) {
 			r.Get("/", handlers.GetCategories)
+			r.Get("/{categoryId}", handlers.GetCategoryDetail)
 			r.Get("/{categoryId}/question/{questionNumber}", nil)
 		})
 	})

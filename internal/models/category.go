@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type Category struct {
 	ID          uint       `json:"id" db:"id"`
@@ -9,4 +11,8 @@ type Category struct {
 	CreatedAt   time.Time  `json:"-"  db:"created_at"`
 	UpdatedAt   time.Time  `json:"-" db:"updated_at"`
 	DeletedAt   *time.Time `json:"-" db:"deleted_at"`
+}
+
+type CategoryDetailResponse struct {
+	QuestionsCount int `json:"questions_count"`
 }

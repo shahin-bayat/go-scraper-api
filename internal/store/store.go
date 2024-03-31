@@ -18,6 +18,7 @@ type store struct {
 	userRepository     *repositories.UserRepository
 	healthRepository   *repositories.HealthRepository
 	categoryRepository *repositories.CategoryRepository
+	questionRepository *repositories.QuestionRepository
 }
 
 func New(db *sqlx.DB, redis *redis.Client) Store {
@@ -28,23 +29,30 @@ func New(db *sqlx.DB, redis *redis.Client) Store {
 
 }
 
-func (e *store) UserRepository() *repositories.UserRepository {
-	if e.userRepository == nil {
-		e.userRepository = repositories.NewUserRepository(e.db, e.redis)
+func (s *store) UserRepository() *repositories.UserRepository {
+	if s.userRepository == nil {
+		s.userRepository = repositories.NewUserRepository(s.db, s.redis)
 	}
-	return e.userRepository
+	return s.userRepository
 }
 
-func (e *store) HealthRepository() *repositories.HealthRepository {
-	if e.healthRepository == nil {
-		e.healthRepository = repositories.NewHealthRepository(e.db, e.redis)
+func (s *store) HealthRepository() *repositories.HealthRepository {
+	if s.healthRepository == nil {
+		s.healthRepository = repositories.NewHealthRepository(s.db, s.redis)
 	}
-	return e.healthRepository
+	return s.healthRepository
 }
 
-func (e *store) CategoryRepository() *repositories.CategoryRepository {
-	if e.categoryRepository == nil {
-		e.categoryRepository = repositories.NewCategoryRepository(e.db)
+func (s *store) CategoryRepository() *repositories.CategoryRepository {
+	if s.categoryRepository == nil {
+		s.categoryRepository = repositories.NewCategoryRepository(s.db)
 	}
-	return e.categoryRepository
+	return s.categoryRepository
+}
+
+func (s *store) QuestionRepository() *repositories.QuestionRepository {
+	if s.questionRepository == nil {
+		s.questionRepository = repositories.NewQuestionRepository(s.db)
+	}
+	return s.questionRepository
 }
