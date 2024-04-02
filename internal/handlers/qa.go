@@ -69,12 +69,6 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
-	// files are saved under assets/images folder
-	// this handler should get filename from the request and return the image
-	// do all checks to prevent directory traversal attacks
-	// if the file does not exist, return 404
-	// if the file exists, return the file
-	// if there is an error, return 500
 	filename := chi.URLParam(r, "filename")
 	if filename == "" {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("filename is required"))
