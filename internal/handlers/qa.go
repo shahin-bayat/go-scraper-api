@@ -33,7 +33,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 
 	category, err := h.store.QARepository().GetCategoryDetail(uintCategoryId)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -60,7 +60,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 
 	question, err := h.store.QARepository().GetQuestionDetail(uintCategoryId, uintQuestionId)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
 	utils.WriteJSON(w, http.StatusOK, question)

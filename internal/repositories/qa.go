@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"fmt"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
 )
@@ -28,7 +30,7 @@ func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDet
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qar.db.Queryx("SELECT q.question_number, q.id FROM category_questions AS cq JOIN questions AS q ON cq.question_id = q.id WHERE category_id = $1 ORDER BY q.id ASC", categoryId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting category detail: %w", err)
 	}
 	defer rows.Close()
 
@@ -36,7 +38,7 @@ func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDet
 		var cdr models.CategoryDetailResponse
 		err := rows.StructScan(&cdr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting category detail: %w", err)
 		}
 		categoryDetailResponse = append(categoryDetailResponse, cdr)
 	}
@@ -54,7 +56,7 @@ func (qar *QARepository) GetQuestionDetail(categoryId int, questionId int) (mode
 	`, categoryId, questionId)
 
 	if err != nil {
-		return models.QuestionDetailResponse{}, err
+		return models.QuestionDetailResponse{}, fmt.Errorf("error getting question detail: %w", err)
 	}
 
 	var answers []models.Answer
@@ -64,7 +66,7 @@ func (qar *QARepository) GetQuestionDetail(categoryId int, questionId int) (mode
         WHERE question_id = $1
     `, questionId)
 	if err != nil {
-		return models.QuestionDetailResponse{}, err
+		return models.QuestionDetailResponse{}, fmt.Errorf("error getting answers: %w", err)
 	}
 
 	questionDetailResponse.Answers = answers
