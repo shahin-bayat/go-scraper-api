@@ -28,7 +28,12 @@ func (qar *QARepository) GetCategories() ([]models.Category, error) {
 
 func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
-	rows, err := qar.db.Queryx("SELECT q.question_number, q.id FROM category_questions AS cq JOIN questions AS q ON cq.question_id = q.id WHERE category_id = $1 ORDER BY q.id ASC", categoryId)
+	rows, err := qar.db.Queryx(`
+			SELECT q.question_number, q.id FROM category_questions AS cq 
+			JOIN questions AS q ON cq.question_id = q.id 
+			WHERE category_id = $1 
+			ORDER BY q.id ASC
+	`, categoryId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category detail: %w", err)
 	}
