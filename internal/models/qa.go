@@ -23,7 +23,7 @@ type Question struct {
 }
 
 type Answer struct {
-	ID         uint       `json:"-" db:"id"`
+	ID         uint       `json:"id" db:"id"`
 	QuestionID uint       `json:"-" db:"question_id"`
 	Text       string     `json:"answer" db:"text"`
 	IsCorrect  bool       `json:"is_correct" db:"is_correct"`
