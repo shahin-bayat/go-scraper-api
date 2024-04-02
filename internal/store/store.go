@@ -9,16 +9,15 @@ import (
 type Store interface {
 	UserRepository() *repositories.UserRepository
 	HealthRepository() *repositories.HealthRepository
-	CategoryRepository() *repositories.CategoryRepository
+	QARepository() *repositories.QARepository
 }
 
 type store struct {
-	db                 *sqlx.DB
-	redis              *redis.Client
-	userRepository     *repositories.UserRepository
-	healthRepository   *repositories.HealthRepository
-	categoryRepository *repositories.CategoryRepository
-	questionRepository *repositories.QuestionRepository
+	db               *sqlx.DB
+	redis            *redis.Client
+	userRepository   *repositories.UserRepository
+	healthRepository *repositories.HealthRepository
+	qaRepository     *repositories.QARepository
 }
 
 func New(db *sqlx.DB, redis *redis.Client) Store {
@@ -43,16 +42,9 @@ func (s *store) HealthRepository() *repositories.HealthRepository {
 	return s.healthRepository
 }
 
-func (s *store) CategoryRepository() *repositories.CategoryRepository {
-	if s.categoryRepository == nil {
-		s.categoryRepository = repositories.NewCategoryRepository(s.db)
+func (s *store) QARepository() *repositories.QARepository {
+	if s.qaRepository == nil {
+		s.qaRepository = repositories.NewQARepository(s.db)
 	}
-	return s.categoryRepository
-}
-
-func (s *store) QuestionRepository() *repositories.QuestionRepository {
-	if s.questionRepository == nil {
-		s.questionRepository = repositories.NewQuestionRepository(s.db)
-	}
-	return s.questionRepository
+	return s.qaRepository
 }
