@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"strings"
 )
 
 func GenerateRandomString(length int) (string, error) {
@@ -19,4 +20,17 @@ func GenerateRandomString(length int) (string, error) {
 
 	// Return the first 'length' characters of the base64 string
 	return randomString[:length], nil
+}
+
+func StringInSlice(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == TrimSpaceLower(str) {
+			return true
+		}
+	}
+	return false
+}
+
+func TrimSpaceLower(str string) string {
+	return strings.TrimSpace(strings.ToLower(str))
 }

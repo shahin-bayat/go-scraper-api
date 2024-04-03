@@ -43,8 +43,17 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
+	var SupportedLanguages = []string{"en"}
+
 	categoryId := chi.URLParam(r, "categoryId")
 	questionId := chi.URLParam(r, "questionId")
+	lang := r.URL.Query().Get("lang")
+
+	if lang != "" && !utils.StringInSlice(SupportedLanguages, lang) {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("language not supported"))
+		return
+	}
+
 	if categoryId == "" || questionId == "" {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("category id and question id are required"))
 		return
@@ -60,7 +69,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	question, err := h.store.QARepository().GetQuestionDetail(uintCategoryId, uintQuestionId)
+	question, err := h.store.QARepository().GetQuestionDetail(uintCategoryId, uintQuestionId, utils.TrimSpaceLower(lang))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return

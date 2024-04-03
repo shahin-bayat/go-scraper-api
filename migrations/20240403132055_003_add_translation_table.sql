@@ -8,14 +8,17 @@ CREATE TABLE IF NOT EXISTS translations (
   refer_id INTEGER NOT NULL,
   type type NOT NULL,
   lang lang NOT NULL,
-  translation TEXT NOT NULL
+  translation TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP
 )
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 SELECT 'down SQL query';
+DROP TABLE translations;
 DROP TYPE type;
 DROP TYPE lang;
-DROP TABLE translations;
 -- +goose StatementEnd
