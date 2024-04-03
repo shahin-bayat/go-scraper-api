@@ -52,7 +52,7 @@ func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDet
 	return categoryDetailResponse, nil
 }
 
-func (qar *QARepository) GetQuestionDetail(categoryId, questionId int, lang string) (models.QuestionDetailResponse, error) {
+func (qar *QARepository) GetQuestionDetail(questionId int, lang string) (models.QuestionDetailResponse, error) {
 	var apiBaseUrl = os.Getenv("API_BASE_URL")
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
@@ -60,11 +60,10 @@ func (qar *QARepository) GetQuestionDetail(categoryId, questionId int, lang stri
 
 	err := qar.db.Get(&response, `
 			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
-			FROM category_questions as cq 
-			JOIN questions AS q ON cq.question_id = q.id 
+			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
-			WHERE cq.category_id = $1 AND cq.question_id = $2
-	`, categoryId, questionId)
+			WHERE q.id = $1
+	`, questionId)
 
 	if err != nil {
 		return models.QuestionDetailResponse{}, fmt.Errorf("error getting question detail: %w", err)
