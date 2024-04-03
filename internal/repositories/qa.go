@@ -29,7 +29,8 @@ func (qar *QARepository) GetCategories() ([]models.Category, error) {
 func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qar.db.Queryx(`
-			SELECT q.question_number, q.id FROM category_questions AS cq 
+			SELECT q.question_number, q.id 
+			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 
 			ORDER BY q.id ASC
@@ -59,6 +60,8 @@ func (qar *QARepository) GetQuestionDetail(categoryId int, questionId int) (mode
 			JOIN images AS i ON i.question_id = q.id 
 			WHERE cq.category_id = $1 AND cq.question_id = $2
 	`, categoryId, questionId)
+
+	// TODO: update questions and answers based on the lang
 
 	if err != nil {
 		return models.QuestionDetailResponse{}, fmt.Errorf("error getting question detail: %w", err)
