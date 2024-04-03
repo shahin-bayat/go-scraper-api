@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
@@ -52,6 +53,7 @@ func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDet
 }
 
 func (qar *QARepository) GetQuestionDetail(categoryId int, questionId int) (models.QuestionDetailResponse, error) {
+	var APIBaseUrl = os.Getenv("API_BASE_URL")
 	var questionDetailResponse models.QuestionDetailResponse
 	err := qar.db.Get(&questionDetailResponse, `
 			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
@@ -60,6 +62,8 @@ func (qar *QARepository) GetQuestionDetail(categoryId int, questionId int) (mode
 			JOIN images AS i ON i.question_id = q.id 
 			WHERE cq.category_id = $1 AND cq.question_id = $2
 	`, categoryId, questionId)
+
+	questionDetailResponse.FileURL = fmt.Sprintf("%s/image/%s", APIBaseUrl, questionDetailResponse.Filename)
 
 	// TODO: update questions and answers based on the lang
 
