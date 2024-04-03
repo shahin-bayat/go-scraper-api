@@ -52,36 +52,66 @@ func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDet
 	return categoryDetailResponse, nil
 }
 
-func (qar *QARepository) GetQuestionDetail(categoryId int, questionId int) (models.QuestionDetailResponse, error) {
-	var APIBaseUrl = os.Getenv("API_BASE_URL")
-	var questionDetailResponse models.QuestionDetailResponse
-	err := qar.db.Get(&questionDetailResponse, `
+func (qar *QARepository) GetQuestionDetail(categoryId, questionId int, lang string) (models.QuestionDetailResponse, error) {
+	var apiBaseUrl = os.Getenv("API_BASE_URL")
+	var questionTranslation models.Translation
+	var answersTranslation []models.Translation
+	var response models.QuestionDetailResponse
+
+	err := qar.db.Get(&response, `
 			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
 			FROM category_questions as cq 
 			JOIN questions AS q ON cq.question_id = q.id 
-			JOIN images AS i ON i.question_id = q.id 
+			JOIN images AS i ON i.question_id = q.id
 			WHERE cq.category_id = $1 AND cq.question_id = $2
 	`, categoryId, questionId)
-
-	questionDetailResponse.FileURL = fmt.Sprintf("%s/image/%s", APIBaseUrl, questionDetailResponse.Filename)
-
-	// TODO: update questions and answers based on the lang
 
 	if err != nil {
 		return models.QuestionDetailResponse{}, fmt.Errorf("error getting question detail: %w", err)
 	}
 
+	response.FileURL = fmt.Sprintf("%s/image/%s", apiBaseUrl, response.Filename)
+
 	var answers []models.Answer
 	err = qar.db.Select(&answers, `
-        SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
-        FROM answers
-        WHERE question_id = $1
-    `, questionId)
+				SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
+				FROM answers
+				WHERE question_id = $1
+		`, questionId)
 	if err != nil {
 		return models.QuestionDetailResponse{}, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	questionDetailResponse.Answers = answers
+	response.Answers = answers
 
-	return questionDetailResponse, nil
+	if lang != "" {
+		err = qar.db.Get(&questionTranslation, `
+			SELECT * from translations
+			WHERE refer_id = $1 AND type = $2 AND lang = $3
+		`, questionId, models.QuestionType, lang)
+		if err != nil {
+			return models.QuestionDetailResponse{}, fmt.Errorf("error getting question translation: %w", err)
+		}
+		err = qar.db.Select(&answersTranslation, `
+			SELECT * from translations
+			WHERE refer_id IN ($1, $2, $3, $4) AND type = $5 AND lang = $6
+		`, answers[0].ID, answers[1].ID, answers[2].ID, answers[3].ID, models.AnswerType, lang)
+		if err != nil {
+			return models.QuestionDetailResponse{}, fmt.Errorf("error getting answers translation: %w", err)
+		}
+
+		response.Question = questionTranslation.Translation
+
+		for i, answer := range response.Answers {
+			for _, translation := range answersTranslation {
+				if uint(answer.ID) == uint(translation.ReferID) {
+					fmt.Printf("answer id: %d, translation refer id: %d\n", answer.ID, translation.ReferID)
+					fmt.Printf("answer text: %s, translation text: %s\n", answer.Text, translation.Translation)
+					response.Answers[i].Text = translation.Translation
+				}
+			}
+		}
+	}
+
+	return response, nil
 }
