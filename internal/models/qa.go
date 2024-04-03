@@ -52,6 +52,7 @@ type QuestionDetailResponse struct {
 	QuestionNumber string   `json:"question_number" db:"question_number"`
 	Question       string   `json:"question" db:"extracted_text"`
 	HasImage       bool     `json:"has_image" db:"has_image"`
-	Filename       string   `json:"filename" db:"file_name"`
+	Filename       string   `json:"-" db:"file_name"`
+	FileURL        string   `json:"file_url"`
 	Answers        []Answer `json:"answers"`
 }
