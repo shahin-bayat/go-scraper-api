@@ -32,17 +32,6 @@ type Answer struct {
 	DeletedAt  *time.Time `json:"-" db:"deleted_at"`
 }
 
-// type Image struct {
-// 	ID            uint       `db:"id"`
-// 	QuestionID    uint       `db:"question_id"`
-// 	HasImage      bool       `db:"has_image"`
-// 	ExtractedText string     `db:"extracted_text"`
-// 	Filename      string     `db:"file_name"`
-// 	CreatedAt     time.Time  `db:"created_at"`
-// 	UpdatedAt     time.Time  `db:"updated_at"`
-// 	DeletedAt     *time.Time `db:"deleted_at"`
-// }
-
 type CategoryDetailResponse struct {
 	QuestionNumber string `json:"question_number" db:"question_number"`
 	QuestionId     int    `json:"question_id" db:"id"`
