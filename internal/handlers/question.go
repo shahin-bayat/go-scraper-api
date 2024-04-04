@@ -12,7 +12,7 @@ import (
 )
 
 func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
-	categories, err := h.store.QARepository().GetCategories()
+	categories, err := h.store.QuestionRepository().GetCategories()
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
@@ -33,7 +33,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := h.store.QARepository().GetCategoryDetail(uintCategoryId)
+	category, err := h.store.QuestionRepository().GetCategoryDetail(uintCategoryId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return
@@ -63,7 +63,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	question, err := h.store.QARepository().GetQuestionDetail(uintQuestionId, utils.TrimSpaceLower(lang))
+	question, err := h.store.QuestionRepository().GetQuestionDetail(uintQuestionId, utils.TrimSpaceLower(lang))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return

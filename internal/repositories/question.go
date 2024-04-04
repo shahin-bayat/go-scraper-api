@@ -8,17 +8,17 @@ import (
 	"github.com/shahin-bayat/scraper-api/internal/models"
 )
 
-type QARepository struct {
+type QuestionRepository struct {
 	db *sqlx.DB
 }
 
-func NewQARepository(db *sqlx.DB) *QARepository {
-	return &QARepository{
+func NewQuestionRepository(db *sqlx.DB) *QuestionRepository {
+	return &QuestionRepository{
 		db: db,
 	}
 }
 
-func (qar *QARepository) GetCategories() ([]models.Category, error) {
+func (qar *QuestionRepository) GetCategories() ([]models.Category, error) {
 	var categories []models.Category
 	err := qar.db.Select(&categories, "SELECT * FROM categories")
 	if err != nil {
@@ -27,7 +27,7 @@ func (qar *QARepository) GetCategories() ([]models.Category, error) {
 	return categories, nil
 }
 
-func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
+func (qar *QuestionRepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qar.db.Queryx(`
 			SELECT q.question_number, q.id 
@@ -52,7 +52,7 @@ func (qar *QARepository) GetCategoryDetail(categoryId int) ([]models.CategoryDet
 	return categoryDetailResponse, nil
 }
 
-func (qar *QARepository) GetQuestionDetail(questionId int, lang string) (models.QuestionDetailResponse, error) {
+func (qar *QuestionRepository) GetQuestionDetail(questionId int, lang string) (models.QuestionDetailResponse, error) {
 	var apiBaseUrl = os.Getenv("API_BASE_URL")
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
