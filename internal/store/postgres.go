@@ -11,17 +11,17 @@ import (
 )
 
 var (
-	database = os.Getenv("DB_DATABASE")
-	password = os.Getenv("DB_PASSWORD")
-	username = os.Getenv("DB_USERNAME")
-	port     = os.Getenv("DB_PORT")
-	host     = os.Getenv("DB_HOST")
+	pgDatabase = os.Getenv("PG_DATABASE")
+	pgPassword = os.Getenv("PG_PASSWORD")
+	pgUser     = os.Getenv("PG_USER")
+	pgPort     = os.Getenv("PG_PORT")
+	pgHost     = os.Getenv("PG_HOST")
 )
 
 func NewPostgresStore() (*sqlx.DB, error) {
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, database)
-	if os.Getenv("DB_INTERNAL_URL") != "" {
-		connStr = os.Getenv("DB_INTERNAL_URL")
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDatabase)
+	if os.Getenv("PG_INTERNAL_URL") != "" {
+		connStr = os.Getenv("PG_INTERNAL_URL")
 	}
 	// to fix the issue with railway app : https://docs.railway.app/guides/private-networking#initialization-time
 	time.Sleep(3 * time.Second)

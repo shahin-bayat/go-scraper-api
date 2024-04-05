@@ -1,0 +1,32 @@
+package utils
+
+import "net/http"
+
+func SetSession(w http.ResponseWriter, r *http.Request, key, value string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     key,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func GetSession(r *http.Request, key string) string {
+	session, err := r.Cookie(key)
+	if err != nil {
+		return ""
+	}
+	return session.Value
+}
+
+func ClearSession(w http.ResponseWriter, r *http.Request, key string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     key,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		SameSite: http.SameSiteStrictMode,
+	})
+}

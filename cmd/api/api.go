@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/shahin-bayat/scraper-api/internal/server"
@@ -15,11 +14,16 @@ func main() {
 	}
 	defer db.Close()
 
-	server := server.Create(db)
-
-	err = server.ListenAndServe()
-
+	redis, err := store.NewRedisStore()
 	if err != nil {
-		panic(fmt.Sprintf("cannot start server: %s", err))
+		log.Fatalf("Failed to create Redis store: %v", err)
 	}
+
+	server, err := server.Create(db, redis)
+	if err != nil {
+		log.Fatalf("Failed to create server: %v", err)
+	}
+
+	log.Fatal(server.ListenAndServe())
+
 }

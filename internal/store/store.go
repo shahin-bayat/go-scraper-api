@@ -2,37 +2,49 @@ package store
 
 import (
 	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
 	"github.com/shahin-bayat/scraper-api/internal/repositories"
 )
 
 type Store interface {
 	UserRepository() *repositories.UserRepository
 	HealthRepository() *repositories.HealthRepository
+	QuestionRepository() *repositories.QuestionRepository
 }
 
 type store struct {
-	db               *sqlx.DB
-	userRepository   *repositories.UserRepository
-	healthRepository *repositories.HealthRepository
+	db                 *sqlx.DB
+	redis              *redis.Client
+	userRepository     *repositories.UserRepository
+	healthRepository   *repositories.HealthRepository
+	questionRepository *repositories.QuestionRepository
 }
 
-func New(db *sqlx.DB) Store {
+func New(db *sqlx.DB, redis *redis.Client) Store {
 	return &store{
-		db: db,
+		db:    db,
+		redis: redis,
 	}
 
 }
 
-func (e *store) UserRepository() *repositories.UserRepository {
-	if e.userRepository == nil {
-		e.userRepository = repositories.NewUserRepository(e.db)
+func (s *store) UserRepository() *repositories.UserRepository {
+	if s.userRepository == nil {
+		s.userRepository = repositories.NewUserRepository(s.db, s.redis)
 	}
-	return e.userRepository
+	return s.userRepository
 }
 
-func (e *store) HealthRepository() *repositories.HealthRepository {
-	if e.healthRepository == nil {
-		e.healthRepository = repositories.NewHealthRepository(e.db)
+func (s *store) HealthRepository() *repositories.HealthRepository {
+	if s.healthRepository == nil {
+		s.healthRepository = repositories.NewHealthRepository(s.db, s.redis)
 	}
-	return e.healthRepository
+	return s.healthRepository
+}
+
+func (s *store) QuestionRepository() *repositories.QuestionRepository {
+	if s.questionRepository == nil {
+		s.questionRepository = repositories.NewQuestionRepository(s.db)
+	}
+	return s.questionRepository
 }
