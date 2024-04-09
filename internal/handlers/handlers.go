@@ -1,18 +1,18 @@
 package handlers
 
 import (
-	"github.com/shahin-bayat/scraper-api/internal/config"
+	"github.com/shahin-bayat/scraper-api/internal/services"
 	"github.com/shahin-bayat/scraper-api/internal/store"
 )
 
 type Handler struct {
-	store  store.Store
-	config *config.Config
+	store    store.Store
+	services *services.Services
 }
 
-func New(store store.Store, config *config.Config) *Handler {
+func New(store store.Store, services *services.Services) *Handler {
 	return &Handler{
-		store:  store,
-		config: config,
+		store:    store,
+		services: services,
 	}
 }
