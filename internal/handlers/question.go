@@ -17,8 +17,7 @@ func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, categories)
-
+	utils.WriteJSON(w, http.StatusOK, categories, nil)
 }
 
 func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +38,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, category)
+	utils.WriteJSON(w, http.StatusOK, category, nil)
 }
 
 func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +67,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, question)
+	utils.WriteJSON(w, http.StatusOK, question, nil)
 }
 
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {

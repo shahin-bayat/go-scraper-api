@@ -70,7 +70,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
 
-	accessToken := r.Header.Get("Authorization")
+	accessToken := r.Header.Get("access_token")
 	if accessToken == "" {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing access token"))
 		return
@@ -100,7 +100,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
 		// TODO: save the new refresh token and access token in the database
 		_ = token.RefreshToken
-		w.Header().Set("Authorization", token.AccessToken)
+		// w.Header().Set("Authorization", token.AccessToken)
 
 	}
 
@@ -117,11 +117,10 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to decode user info: %w", err))
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Authorization", token.AccessToken)
-	w.WriteHeader(http.StatusOK)
-	utils.WriteJSON(w, http.StatusOK, userData)
+	headers := map[string]string{
+		"access_token": token.AccessToken,
+	}
+	utils.WriteJSON(w, http.StatusOK, userData, headers)
 
 }
 
