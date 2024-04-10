@@ -43,13 +43,13 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 	sessionState := utils.GetSession(r, "state")
 
 	if state != sessionState {
-		http.Error(w, "State mismatch", http.StatusBadRequest)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("state does not match"))
 		return
 	}
 
 	token, err := h.services.AuthService.Google.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier))
 	if err != nil {
-		http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to exchange token: %w", err))
 		return
 	}
 
@@ -58,11 +58,11 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 	// TODO: if the user is in the database, update the user info, access token and refresh token in the database
 	googleAuthClientUrl := os.Getenv("GOOGLE_AUTH_CLIENT_URL")
 	if googleAuthClientUrl == "" {
-		http.Error(w, "Failed to get google auth client url", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get google auth client url"))
+		return
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("%saccess_token=%s", googleAuthClientUrl, token.AccessToken), http.StatusTemporaryRedirect)
-
 }
 
 func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +72,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
 	accessToken := r.Header.Get("Authorization")
 	if accessToken == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing access token"))
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		AccessToken: accessToken,
 	}).Token()
 	if err != nil {
-		http.Error(w, "Failed to validate token", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to validate token: %w", err))
 		return
 	}
 
@@ -94,7 +94,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		}).Token()
 
 		if err != nil {
-			http.Error(w, "Failed to refresh token", http.StatusInternalServerError)
+			utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get new access token: %w", err))
 			return
 		}
 
@@ -107,21 +107,21 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 	client := h.services.AuthService.Google.Client(r.Context(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
-		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get user info: %w", err))
 		return
 	}
 	defer resp.Body.Close()
 
 	var userData map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
-		http.Error(w, "Failed to read user info", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to decode user info: %w", err))
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Authorization", token.AccessToken)
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(userData)
+	utils.WriteJSON(w, http.StatusOK, userData)
 
 }
 
