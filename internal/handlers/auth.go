@@ -53,21 +53,6 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	client := h.services.AuthService.Google.Client(r.Context(), token)
-
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	var userData map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
-		http.Error(w, "Failed to read user info", http.StatusInternalServerError)
-		return
-	}
-
 	// TODO: use user email or id and check if the user is already in the database
 	// TODO:if the user is not in the database, add the user with access token and refresh token to the database
 	// TODO: if the user is in the database, update the user info, access token and refresh token in the database
@@ -81,6 +66,7 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
+	var token *oauth2.Token
 	provider := chi.URLParam(r, "provider")
 	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
 
@@ -118,9 +104,24 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	client := h.services.AuthService.Google.Client(r.Context(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var userData map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
+		http.Error(w, "Failed to read user info", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Authorization", token.AccessToken)
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(userData)
 
 }
 
