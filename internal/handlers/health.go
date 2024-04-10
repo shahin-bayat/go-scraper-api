@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/shahin-bayat/scraper-api/internal/utils"
 )
 
 func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -34,8 +35,6 @@ func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set response headers and write JSON response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(response)
+	utils.WriteJSON(w, http.StatusOK, response, nil)
+
 }
