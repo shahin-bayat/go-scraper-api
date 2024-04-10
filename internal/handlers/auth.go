@@ -62,7 +62,7 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("%saccess_token=%s", googleAuthClientUrl, token.AccessToken), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", googleAuthClientUrl, token.AccessToken), http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
