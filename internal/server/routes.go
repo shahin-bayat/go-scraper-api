@@ -7,22 +7,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/shahin-bayat/scraper-api/internal/config"
 	"github.com/shahin-bayat/scraper-api/internal/handlers"
 	"github.com/shahin-bayat/scraper-api/internal/services"
 	"github.com/shahin-bayat/scraper-api/internal/store"
 )
 
-func RegisterRoutes(store store.Store, services *services.Services) http.Handler {
+func RegisterRoutes(store store.Store, services *services.Services, appConfig *config.AppConfig) http.Handler {
 	r := chi.NewRouter()
-	handlers := handlers.New(store, services)
+	handlers := handlers.New(store, services, appConfig)
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	r.Get("/health", handlers.HealthHandler)
-
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Get("/health", handlers.HealthHandler)
 		r.Get("/auth/{provider}/user-info", handlers.GetUserInfo)
 		r.Get("/auth/{provider}/login", handlers.HandleProviderLogin)
 		r.Get("/auth/{provider}/callback", handlers.HandleProviderCallback)
