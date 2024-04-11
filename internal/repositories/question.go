@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
@@ -52,8 +51,8 @@ func (qr *QuestionRepository) GetCategoryDetail(categoryId int) ([]models.Catego
 	return categoryDetailResponse, nil
 }
 
-func (qr *QuestionRepository) GetQuestionDetail(questionId int, lang string) (models.QuestionDetailResponse, error) {
-	var apiBaseUrl = os.Getenv("API_BASE_URL")
+func (qr *QuestionRepository) GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
+
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
 	var response models.QuestionDetailResponse

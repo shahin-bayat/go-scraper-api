@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
@@ -56,13 +55,7 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 	// TODO: use user email or id and check if the user is already in the database
 	// TODO:if the user is not in the database, add the user with access token and refresh token to the database
 	// TODO: if the user is in the database, update the user info, access token and refresh token in the database
-	googleAuthClientUrl := os.Getenv("GOOGLE_AUTH_CLIENT_URL")
-	if googleAuthClientUrl == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get google auth client url"))
-		return
-	}
-	fmt.Println(token.AccessToken)
-	http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", googleAuthClientUrl, token.AccessToken), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", h.appConfig.AppUniversalURL, token.AccessToken), http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
