@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
@@ -18,18 +17,18 @@ func NewQuestionRepository(db *sqlx.DB) *QuestionRepository {
 	}
 }
 
-func (qar *QuestionRepository) GetCategories() ([]models.Category, error) {
+func (qr *QuestionRepository) GetCategories() ([]models.Category, error) {
 	var categories []models.Category
-	err := qar.db.Select(&categories, "SELECT * FROM categories")
+	err := qr.db.Select(&categories, "SELECT * FROM categories")
 	if err != nil {
 		return nil, err
 	}
 	return categories, nil
 }
 
-func (qar *QuestionRepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
+func (qr *QuestionRepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
-	rows, err := qar.db.Queryx(`
+	rows, err := qr.db.Queryx(`
 			SELECT q.question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
@@ -52,13 +51,13 @@ func (qar *QuestionRepository) GetCategoryDetail(categoryId int) ([]models.Categ
 	return categoryDetailResponse, nil
 }
 
-func (qar *QuestionRepository) GetQuestionDetail(questionId int, lang string) (models.QuestionDetailResponse, error) {
-	var apiBaseUrl = os.Getenv("API_BASE_URL")
+func (qr *QuestionRepository) GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
+
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
 	var response models.QuestionDetailResponse
 
-	err := qar.db.Get(&response, `
+	err := qr.db.Get(&response, `
 			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
@@ -72,7 +71,7 @@ func (qar *QuestionRepository) GetQuestionDetail(questionId int, lang string) (m
 	response.FileURL = fmt.Sprintf("%s/image/%s", apiBaseUrl, response.Filename)
 
 	var answers []models.Answer
-	err = qar.db.Select(&answers, `
+	err = qr.db.Select(&answers, `
 				SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
 				FROM answers
 				WHERE question_id = $1
@@ -84,14 +83,14 @@ func (qar *QuestionRepository) GetQuestionDetail(questionId int, lang string) (m
 	response.Answers = answers
 
 	if lang != "" {
-		err = qar.db.Get(&questionTranslation, `
+		err = qr.db.Get(&questionTranslation, `
 			SELECT * from translations
 			WHERE refer_id = $1 AND type = $2 AND lang = $3
 		`, questionId, models.QuestionType, lang)
 		if err != nil {
 			return models.QuestionDetailResponse{}, fmt.Errorf("error getting question translation: %w", err)
 		}
-		err = qar.db.Select(&answersTranslation, `
+		err = qr.db.Select(&answersTranslation, `
 			SELECT * from translations
 			WHERE refer_id IN ($1, $2, $3, $4) AND type = $5 AND lang = $6
 		`, answers[0].ID, answers[1].ID, answers[2].ID, answers[3].ID, models.AnswerType, lang)

@@ -42,8 +42,8 @@ type translationResponse struct {
 func main() {
 
 	connStrLocal := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDatabase)
-	connectStrDev := os.Getenv("PG_DEV_URL")
-	connStrProd := os.Getenv("PG_PROD_URL")
+	// connectStrDev := os.Getenv("PG_DEV_URL")
+	// connStrProd := os.Getenv("PG_PROD_URL")
 
 	deeplAPIKey := os.Getenv("DEEPL_API_KEY")
 	if deeplAPIKey == "" {
@@ -53,15 +53,16 @@ func main() {
 
 	client := http.Client{}
 
-	translateQuestions(&client, deeplAPIKey, connStrLocal)
-	translateQuestions(&client, deeplAPIKey, connectStrDev)
-	translateQuestions(&client, deeplAPIKey, connStrProd)
-	translateAnswers(&client, deeplAPIKey, connStrLocal)
-	translateAnswers(&client, deeplAPIKey, connectStrDev)
-	translateAnswers(&client, deeplAPIKey, connStrProd)
+	translateQuestions(&client, deeplAPIKey, connStrLocal, "EN")
+	// translateQuestions(&client, deeplAPIKey, connectStrDev, "EN")
+	// translateQuestions(&client, deeplAPIKey, connStrProd, "EN")
+
+	translateAnswers(&client, deeplAPIKey, connStrLocal, "EN")
+	// translateAnswers(&client, deeplAPIKey, connectStrDev, "EN")
+	// translateAnswers(&client, deeplAPIKey, connStrProd, "EN")
 }
 
-func translateQuestions(client *http.Client, deeplAPIKey, connStr string) {
+func translateQuestions(client *http.Client, deeplAPIKey, connStr, lang string) {
 	questions := []question{}
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
@@ -81,10 +82,11 @@ func translateQuestions(client *http.Client, deeplAPIKey, connStr string) {
 	}
 
 	for _, q := range questions {
+		fmt.Printf("Translating question: %s\n", q.Question)
 		text := q.Question
 		payloadData := map[string]interface{}{
 			"text":        []string{text},
-			"target_lang": "EN",
+			"target_lang": lang,
 		}
 
 		payloadBytes, err := json.Marshal(payloadData)
@@ -131,7 +133,7 @@ func translateQuestions(client *http.Client, deeplAPIKey, connStr string) {
 	}
 }
 
-func translateAnswers(client *http.Client, deeplAPIKey, connStr string) {
+func translateAnswers(client *http.Client, deeplAPIKey, connStr, lang string) {
 	answers := []answer{}
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
@@ -150,10 +152,11 @@ func translateAnswers(client *http.Client, deeplAPIKey, connStr string) {
 	}
 
 	for _, a := range answers {
+		fmt.Printf("Translating answer: %s\n", a.Text)
 		text := a.Text
 		payloadData := map[string]interface{}{
 			"text":        []string{text},
-			"target_lang": "EN",
+			"target_lang": lang,
 		}
 
 		payloadBytes, err := json.Marshal(payloadData)

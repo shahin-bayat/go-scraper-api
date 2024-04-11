@@ -1,14 +1,24 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 	"golang.org/x/oauth2"
 )
 
-func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+type contextKey string
+
+const providerKey contextKey = "provider"
+
+func (h *Handler) HandleProviderLogin(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
+
 	verifier := oauth2.GenerateVerifier()
 	state, err := utils.GenerateRandomString(32)
 	if err != nil {
@@ -17,89 +27,93 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	utils.SetSession(w, r, "verifier", verifier)
 	utils.SetSession(w, r, "state", state)
-	url := h.config.OAuth2Config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier))
+	url := h.services.AuthService.Google.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier))
+
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
+
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
-
-	if state != utils.GetSession(r, "state") {
-		http.Error(w, "State mismatch", http.StatusBadRequest)
-		return
-	}
-
 	verifier := utils.GetSession(r, "verifier")
-	token, err := h.config.OAuth2Config.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier))
-	if err != nil {
-		http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
+	sessionState := utils.GetSession(r, "state")
+
+	if state != sessionState {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("state does not match"))
 		return
 	}
 
-	client := h.config.OAuth2Config.Client(r.Context(), token)
-
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	token, err := h.services.AuthService.Google.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier))
 	if err != nil {
-		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	var userData map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
-		http.Error(w, "Failed to read user info", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to exchange token: %w", err))
 		return
 	}
 
 	// TODO: use user email or id and check if the user is already in the database
 	// TODO:if the user is not in the database, add the user with access token and refresh token to the database
 	// TODO: if the user is in the database, update the user info, access token and refresh token in the database
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Authorization", token.AccessToken)
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(userData)
+	http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", h.appConfig.AppUniversalURL, token.AccessToken), http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) HandleAuthStatus(w http.ResponseWriter, r *http.Request) {
-	accessToken := r.Header.Get("Authorization")
+func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
+	var token *oauth2.Token
+	provider := chi.URLParam(r, "provider")
+	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
+
+	accessToken := r.Header.Get("access_token")
 	if accessToken == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing access token"))
 		return
 	}
 
 	// validate the access token
-	token, err := h.config.OAuth2Config.TokenSource(r.Context(), &oauth2.Token{
+	token, err := h.services.AuthService.Google.TokenSource(r.Context(), &oauth2.Token{
 		AccessToken: accessToken,
 	}).Token()
 	if err != nil {
-		http.Error(w, "Failed to validate token", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusUnauthorized, fmt.Errorf("failed to validate token: %w", err))
 		return
 	}
 
 	if !token.Valid() {
 		// TODO: fetch the user using provided access token
 		// TODO: use the refresh token in the database to get a new access token
-		token, err := h.config.OAuth2Config.TokenSource(r.Context(), &oauth2.Token{
+		token, err := h.services.AuthService.Google.TokenSource(r.Context(), &oauth2.Token{
 			// this should be the refresh token saved in the database
 			RefreshToken: token.RefreshToken,
 		}).Token()
 
 		if err != nil {
-			http.Error(w, "Failed to refresh token", http.StatusInternalServerError)
+			utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get new access token: %w", err))
 			return
 		}
 
 		// TODO: save the new refresh token and access token in the database
 		_ = token.RefreshToken
-		w.Header().Set("Authorization", token.AccessToken)
+		// w.Header().Set("Authorization", token.AccessToken)
 
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Authorization", token.AccessToken)
-	w.WriteHeader(http.StatusOK)
+	client := h.services.AuthService.Google.Client(r.Context(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get user info: %w", err))
+		return
+	}
+	defer resp.Body.Close()
+
+	var userData map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to decode user info: %w", err))
+		return
+	}
+	headers := map[string]string{
+		"access_token": token.AccessToken,
+	}
+	utils.WriteJSON(w, http.StatusOK, userData, headers)
 
 }
 

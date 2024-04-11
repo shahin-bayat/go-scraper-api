@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/shahin-bayat/scraper-api/internal/utils"
 )
 
 func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -27,15 +27,6 @@ func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Add more health checks as needed
 
-	// Marshal health status to JSON
-	response, err := json.Marshal(healthStatus)
-	if err != nil {
-		http.Error(w, "Failed to marshal health status", http.StatusInternalServerError)
-		return
-	}
+	utils.WriteJSON(w, http.StatusOK, healthStatus, nil)
 
-	// Set response headers and write JSON response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(response)
 }
