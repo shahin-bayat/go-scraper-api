@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
@@ -12,18 +11,13 @@ import (
 	"github.com/stripe/stripe-go/webhook"
 )
 
-type config struct {
+type paymentConfig struct {
 	PublishableKey string `json:"publishableKey"`
 }
 
 func (h *Handler) HandlePaymentConfig(w http.ResponseWriter, r *http.Request) {
-	publishableKey := os.Getenv("STRIPE_PUBLISHABLE_KEY")
-	if publishableKey == "" {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("stripe publishable key not set"))
-		return
-	}
-	config := config{
-		PublishableKey: publishableKey,
+	config := paymentConfig{
+		PublishableKey: h.appConfig.StripePublishableKey,
 	}
 
 	utils.WriteJSON(w, http.StatusOK, config, nil)
@@ -37,13 +31,7 @@ func (h *Handler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stripeWebhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-	if stripeWebhookSecret == "" {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("stripe webhook secret not set"))
-		return
-	}
-
-	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), stripeWebhookSecret)
+	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), h.appConfig.StripeWebhookSecret)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
@@ -63,13 +51,7 @@ func (h *Handler) HandlePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	paymentSecretKey := os.Getenv("STRIPE_SECRET_KEY")
-	if paymentSecretKey == "" {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("stripe secret key not set"))
-		return
-	}
-
-	stripe.Key = paymentSecretKey
+	stripe.Key = h.appConfig.StripeSecretKey
 
 	// TODO: with subscription_id fetch subscription details and fill the params like Amount, Currency, Customer, PaymentMethod
 	params := &stripe.PaymentIntentParams{

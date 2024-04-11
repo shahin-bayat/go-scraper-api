@@ -1,20 +1,16 @@
 package config
 
 import (
-	"fmt"
+	"log"
 	"os"
+	"strconv"
 
 	_ "github.com/joho/godotenv/autoload"
 )
 
-type EnvError struct {
-	Key     string
-	Message string
-}
-
-func (e *EnvError) Error() string {
-	return fmt.Sprintf("environment variable '%s': %s", e.Key, e.Message)
-}
+var AppConf *AppConfig
+var PostgresConf *PostgresConfig
+var RedisConf *RedisConfig
 
 type PostgresConfig struct {
 	PgDatabase    string
@@ -34,15 +30,20 @@ type RedisConfig struct {
 	RedisInternalUrl string
 }
 
-type config struct {
-	Postgres *PostgresConfig
-	Redis    *RedisConfig
+type AppConfig struct {
+	Port                 int
+	APIBaseURL           string
+	AppUniversalURL      string
+	StripePublishableKey string
+	StripeWebhookSecret  string
+	StripeSecretKey      string
+	GoogleClientID       string
+	GoogleClientSecret   string
+	GoogleRedirectURL    string
 }
 
-var Config *config
-
 func init() {
-	postgresConfig := &PostgresConfig{
+	PostgresConf = &PostgresConfig{
 		PgDatabase:    os.Getenv("PG_DATABASE"),
 		PgPassword:    os.Getenv("PG_PASSWORD"),
 		PgUser:        os.Getenv("PG_USER"),
@@ -50,7 +51,7 @@ func init() {
 		PgHost:        os.Getenv("PG_HOST"),
 		PgInternalUrl: os.Getenv("PG_INTERNAL_URL"),
 	}
-	redisConfig := &RedisConfig{
+	RedisConf = &RedisConfig{
 		RedisUser:        os.Getenv("REDIS_USER"),
 		RedisPassword:    os.Getenv("REDIS_PASSWORD"),
 		RedisHost:        os.Getenv("REDIS_HOST"),
@@ -59,17 +60,33 @@ func init() {
 		RedisInternalUrl: os.Getenv("REDIS_INTERNAL_URL"),
 	}
 
-	Config = &config{
-		Postgres: postgresConfig,
-		Redis:    redisConfig,
+	AppConf = &AppConfig{
+		Port:                 getIntEnv("PORT"),
+		APIBaseURL:           getStringEnv("API_BASE_URL"),
+		AppUniversalURL:      getStringEnv("APP_UNIVERSAL_URL"),
+		StripePublishableKey: getStringEnv("STRIPE_PUBLISHABLE_KEY"),
+		StripeWebhookSecret:  getStringEnv("STRIPE_WEBHOOK_SECRET"),
+		StripeSecretKey:      getStringEnv("STRIPE_SECRET_KEY"),
 	}
 
 }
 
-// func getStringEnv(key string) (string, error) {
-// 	value := os.Getenv(key)
-// 	if value == "" {
-// 		return "", &EnvError{Key: key, Message: "environment variable is not set"}
-// 	}
-// 	return value, nil
-// }
+func getStringEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("Environment variable %s is not set", key)
+	}
+	return value
+}
+
+func getIntEnv(key string) int {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("Environment variable %s is not set", key)
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		log.Fatalf("Environment variable %s is not an integer", key)
+	}
+	return intValue
+}
