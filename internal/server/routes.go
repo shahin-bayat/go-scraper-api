@@ -28,6 +28,10 @@ func RegisterRoutes(store store.Store, services *services.Services) http.Handler
 		r.Get("/auth/{provider}/callback", handlers.HandleProviderCallback)
 		r.Get("/auth/{provider}/logout", handlers.HandleLogout)
 
+		r.Get("/payment/config", handlers.HandlePaymentConfig)
+		r.Post("/payment/webhook", handlers.HandlePaymentWebhook)
+		r.Post("/payment/intent", handlers.HandlePaymentIntent)
+
 		r.Group(func(r chi.Router) {
 			// r.Use(handlers.AuthMiddleware)
 			r.Route("/category", func(r chi.Router) {
