@@ -62,11 +62,12 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	question, err := h.store.QuestionRepository().GetQuestionDetail(uintQuestionId, utils.TrimSpaceLower(lang))
+	question, err := h.store.QuestionRepository().GetQuestionDetail(uintQuestionId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return
 	}
+
 	utils.WriteJSON(w, http.StatusOK, question, nil)
 }
 
