@@ -3,16 +3,25 @@ package store
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/shahin-bayat/scraper-api/internal/config"
 )
 
-func NewRedisStore(cfg *config.RedisConfig) (*redis.Client, error) {
-	connStr := fmt.Sprintf("redis://%s:%s@%s:%s/%s", cfg.RedisUser, cfg.RedisPassword, cfg.RedisHost, cfg.RedisPort, cfg.RedisDB)
+var (
+	redisUser     = os.Getenv("REDIS_USER")
+	redisPassword = os.Getenv("REDIS_PASSWORD")
+	redisHost     = os.Getenv("REDIS_HOST")
+	redisPort     = os.Getenv("REDIS_PORT")
+	redisDB       = os.Getenv("REDIS_DB")
+)
 
-	if cfg.RedisInternalUrl != "" {
-		connStr = cfg.RedisInternalUrl
+func NewRedisStore() (*redis.Client, error) {
+
+	connStr := fmt.Sprintf("redis://%s:%s@%s:%s/%s", redisUser, redisPassword, redisHost, redisPort, redisDB)
+
+	if os.Getenv("REDIS_INTERNAL_URL") != "" {
+		connStr = os.Getenv("REDIS_INTERNAL_URL")
 	}
 	opt, err := redis.ParseURL(connStr)
 	if err != nil {

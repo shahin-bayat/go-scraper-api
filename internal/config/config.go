@@ -1,92 +1,36 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
-	"strconv"
 
-	_ "github.com/joho/godotenv/autoload"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
-var AppConf *AppConfig
-var PostgresConf *PostgresConfig
-var RedisConf *RedisConfig
-
-type PostgresConfig struct {
-	PgDatabase    string
-	PgPassword    string
-	PgUser        string
-	PgPort        string
-	PgHost        string
-	PgInternalUrl string
+type Config struct {
+	OAuth2Config oauth2.Config
 }
 
-type RedisConfig struct {
-	RedisUser        string
-	RedisPassword    string
-	RedisHost        string
-	RedisPort        string
-	RedisDB          string
-	RedisInternalUrl string
-}
-
-type AppConfig struct {
-	Port                 int
-	APIBaseURL           string
-	AppUniversalURL      string
-	StripePublishableKey string
-	StripeWebhookSecret  string
-	StripeSecretKey      string
-	GoogleClientID       string
-	GoogleClientSecret   string
-	GoogleRedirectURL    string
-}
-
-func init() {
-	PostgresConf = &PostgresConfig{
-		PgDatabase:    os.Getenv("PG_DATABASE"),
-		PgPassword:    os.Getenv("PG_PASSWORD"),
-		PgUser:        os.Getenv("PG_USER"),
-		PgPort:        os.Getenv("PG_PORT"),
-		PgHost:        os.Getenv("PG_HOST"),
-		PgInternalUrl: os.Getenv("PG_INTERNAL_URL"),
+func New() (*Config, error) {
+	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
+		return nil, fmt.Errorf("GOOGLE_CLIENT_ID is required")
 	}
-	RedisConf = &RedisConfig{
-		RedisUser:        os.Getenv("REDIS_USER"),
-		RedisPassword:    os.Getenv("REDIS_PASSWORD"),
-		RedisHost:        os.Getenv("REDIS_HOST"),
-		RedisPort:        os.Getenv("REDIS_PORT"),
-		RedisDB:          os.Getenv("REDIS_DB"),
-		RedisInternalUrl: os.Getenv("REDIS_INTERNAL_URL"),
+	if os.Getenv("GOOGLE_CLIENT_SECRET") == "" {
+		return nil, fmt.Errorf("GOOGLE_CLIENT_SECRET is required")
+	}
+	if os.Getenv("GOOGLE_REDIRECT_URL") == "" {
+		return nil, fmt.Errorf("GOOGLE_REDIRECT_URL is required")
 	}
 
-	AppConf = &AppConfig{
-		Port:                 getIntEnv("PORT"),
-		APIBaseURL:           getStringEnv("API_BASE_URL"),
-		AppUniversalURL:      getStringEnv("APP_UNIVERSAL_URL"),
-		StripePublishableKey: getStringEnv("STRIPE_PUBLISHABLE_KEY"),
-		StripeWebhookSecret:  getStringEnv("STRIPE_WEBHOOK_SECRET"),
-		StripeSecretKey:      getStringEnv("STRIPE_SECRET_KEY"),
-	}
+	return &Config{
+		OAuth2Config: oauth2.Config{
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
+			Endpoint:     google.Endpoint,
+			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		},
+	}, nil
 
-}
-
-func getStringEnv(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("Environment variable %s is not set", key)
-	}
-	return value
-}
-
-func getIntEnv(key string) int {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("Environment variable %s is not set", key)
-	}
-	intValue, err := strconv.Atoi(value)
-	if err != nil {
-		log.Fatalf("Environment variable %s is not an integer", key)
-	}
-	return intValue
 }

@@ -2,14 +2,13 @@ package utils
 
 import "net/http"
 
-// TODO: CHECK FRO PRODUCTION and use samesite, http only and secure
 func SetSession(w http.ResponseWriter, r *http.Request, key, value string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     key,
 		Value:    value,
 		Path:     "/",
-		HttpOnly: false,
-		// SameSite: http.SameSiteStrictMode,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	})
 }
 

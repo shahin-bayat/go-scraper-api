@@ -3,25 +3,23 @@ package main
 import (
 	"log"
 
-	c "github.com/shahin-bayat/scraper-api/internal/config"
 	"github.com/shahin-bayat/scraper-api/internal/server"
 	"github.com/shahin-bayat/scraper-api/internal/store"
 )
 
 func main() {
-
-	db, err := store.NewPostgresStore(c.PostgresConf)
+	db, err := store.NewPostgresStore()
 	if err != nil {
 		log.Fatalf("Failed to create Postgres store: %v", err)
 	}
 	defer db.Close()
 
-	redis, err := store.NewRedisStore(c.RedisConf)
+	redis, err := store.NewRedisStore()
 	if err != nil {
 		log.Fatalf("Failed to create Redis store: %v", err)
 	}
 
-	server, err := server.Create(db, redis, c.AppConf)
+	server, err := server.Create(db, redis)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}

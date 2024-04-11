@@ -2,20 +2,28 @@ package store
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/shahin-bayat/scraper-api/internal/config"
 )
 
-func NewPostgresStore(cfg *config.PostgresConfig) (*sqlx.DB, error) {
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", cfg.PgUser, cfg.PgPassword, cfg.PgHost, cfg.PgPort, cfg.PgDatabase)
-	if cfg.PgInternalUrl != "" {
-		connStr = cfg.PgInternalUrl
+var (
+	pgDatabase = os.Getenv("PG_DATABASE")
+	pgPassword = os.Getenv("PG_PASSWORD")
+	pgUser     = os.Getenv("PG_USER")
+	pgPort     = os.Getenv("PG_PORT")
+	pgHost     = os.Getenv("PG_HOST")
+)
+
+func NewPostgresStore() (*sqlx.DB, error) {
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDatabase)
+	if os.Getenv("PG_INTERNAL_URL") != "" {
+		connStr = os.Getenv("PG_INTERNAL_URL")
 	}
-	//INFO: to fix the issue with railway app : https://docs.railway.app/guides/private-networking#initialization-time
+	// to fix the issue with railway app : https://docs.railway.app/guides/private-networking#initialization-time
 	time.Sleep(3 * time.Second)
 
 	db, err := sqlx.Connect("postgres", connStr)
