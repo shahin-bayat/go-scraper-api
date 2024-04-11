@@ -61,7 +61,7 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get google auth client url"))
 		return
 	}
-
+	fmt.Println(token.AccessToken)
 	http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", googleAuthClientUrl, token.AccessToken), http.StatusTemporaryRedirect)
 }
 
@@ -81,7 +81,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		AccessToken: accessToken,
 	}).Token()
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to validate token: %w", err))
+		utils.WriteErrorJSON(w, http.StatusUnauthorized, fmt.Errorf("failed to validate token: %w", err))
 		return
 	}
 
