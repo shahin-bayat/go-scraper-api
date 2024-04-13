@@ -103,8 +103,6 @@ func (qr *QuestionRepository) GetQuestionDetail(questionId int, lang string, api
 		for i, answer := range response.Answers {
 			for _, translation := range answersTranslation {
 				if uint(answer.ID) == uint(translation.ReferID) {
-					fmt.Printf("answer id: %d, translation refer id: %d\n", answer.ID, translation.ReferID)
-					fmt.Printf("answer text: %s, translation text: %s\n", answer.Text, translation.Translation)
 					response.Answers[i].Text = translation.Translation
 				}
 			}

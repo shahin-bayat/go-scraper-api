@@ -19,7 +19,7 @@ func NewAuthService(appConfig *config.AppConfig) (*AuthService, error) {
 			ClientSecret: appConfig.GoogleClientSecret,
 			RedirectURL:  appConfig.GoogleRedirectURL,
 			Endpoint:     google.Endpoint,
-			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile", "openid"},
 		},
 	}, nil
 }
