@@ -1,8 +1,28 @@
 package models
 
+import "time"
+
+type GoogleUserInfo struct {
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Name          string `json:"name"`
+	Locale        string `json:"locale"`
+	AvatarURL     string `json:"picture"`
+	VerifiedEmail bool   `json:"verified_email"`
+}
+
 type User struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Age  int    `json:"age"`
-	// other fields relevant to the database schema
+	ID            uint       `json:"-" db:"id"`
+	Email         string     `json:"email" db:"email"`
+	GivenName     string     `json:"given_name" db:"given_name"`
+	FamilyName    string     `json:"family_name" db:"family_name"`
+	Name          string     `json:"name" db:"name"`
+	Locale        string     `json:"locale" db:"locale"`
+	AvatarURL     string     `json:"avatar_url" db:"avatar_url"`
+	VerifiedEmail bool       `json:"verified_email" db:"verified_email"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
+	DeletedAt     *time.Time `json:"deleted_at" db:"deleted_at"`
 }
