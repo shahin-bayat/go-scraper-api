@@ -47,7 +47,7 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	token, err := h.services.AuthService.Google.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier))
+	token, err := h.services.AuthService.Google.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier), oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to exchange token: %w", err))
 		return
