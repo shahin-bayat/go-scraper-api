@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -84,9 +83,6 @@ func (ur *UserRepository) UpdateUserSession(userId uint, token *oauth2.Token) er
 		return fmt.Errorf("no token provided")
 	}
 
-	j, _ := json.Marshal(token)
-	fmt.Println("token", string(j))
-
 	redisKey := fmt.Sprintf("user:%d", userId)
 
 	err := ur.redis.HSet(context.Background(), redisKey, "access_token", token.AccessToken).Err()
@@ -115,8 +111,6 @@ func (ur *UserRepository) UpdateUserSession(userId uint, token *oauth2.Token) er
 func (ur *UserRepository) CreateUser(user *models.User) (uint, error) {
 	var newUserId uint
 	ur.db.QueryRow("INSERT INTO users (email, given_name, family_name, name, locale, avatar_url, verified_email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", user.Email, user.GivenName, user.FamilyName, user.Name, user.Locale, user.AvatarURL, user.VerifiedEmail).Scan(&newUserId)
-
-	fmt.Println("newUser", newUserId)
 
 	return newUserId, nil
 }
