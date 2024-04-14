@@ -40,6 +40,8 @@ type AppConfig struct {
 	GoogleClientID       string
 	GoogleClientSecret   string
 	GoogleRedirectURL    string
+	GoogleUserInfoURL    string
+	GoogleRevokeURL      string
 }
 
 func init() {
@@ -67,6 +69,11 @@ func init() {
 		StripePublishableKey: getStringEnv("STRIPE_PUBLISHABLE_KEY"),
 		StripeWebhookSecret:  getStringEnv("STRIPE_WEBHOOK_SECRET"),
 		StripeSecretKey:      getStringEnv("STRIPE_SECRET_KEY"),
+		GoogleClientID:       getStringEnv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret:   getStringEnv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL:    getStringEnv("GOOGLE_REDIRECT_URL"),
+		GoogleUserInfoURL:    getStringEnv("GOOGLE_USER_INFO_URL"),
+		GoogleRevokeURL:      getStringEnv("GOOGLE_REVOKE_URL"),
 	}
 
 }

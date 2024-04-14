@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 	"golang.org/x/oauth2"
 )
@@ -46,16 +47,70 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	token, err := h.services.AuthService.Google.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier))
+	token, err := h.services.AuthService.Google.Exchange(r.Context(), code, oauth2.SetAuthURLParam("code_verifier", verifier), oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to exchange token: %w", err))
 		return
 	}
 
-	// TODO: use user email or id and check if the user is already in the database
-	// TODO:if the user is not in the database, add the user with access token and refresh token to the database
-	// TODO: if the user is in the database, update the user info, access token and refresh token in the database
-	http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", h.appConfig.AppUniversalURL, token.AccessToken), http.StatusTemporaryRedirect)
+	appRedirectURL := generateAppRedirectURL(h.appConfig.AppUniversalURL, token.AccessToken, token.RefreshToken)
+
+	userInfo, err := getUserInfo(r, h.services.AuthService.Google, token, h.appConfig.GoogleUserInfoURL)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get user info: %w", err))
+		return
+	}
+
+	// check if the user exists in database
+	existingUser, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
+	if err != nil {
+		// user doesn't exist
+		newUser := models.User{
+			Email:         userInfo.Email,
+			GivenName:     userInfo.GivenName,
+			FamilyName:    userInfo.FamilyName,
+			Name:          userInfo.Name,
+			Locale:        userInfo.Locale,
+			AvatarURL:     userInfo.AvatarURL,
+			VerifiedEmail: userInfo.VerifiedEmail,
+		}
+		// create the user in the database
+		userId, err := h.store.UserRepository().CreateUser(&newUser)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user: %w",
+				err))
+			return
+		}
+		// create the session in Redis
+		err = h.store.UserRepository().CreateUserSession(userId, token)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user session: %w", err))
+			return
+		}
+		http.Redirect(w, r, appRedirectURL, http.StatusTemporaryRedirect)
+		return
+	}
+
+	// user exists
+	// check if the session exists
+	_, err = h.store.UserRepository().GetUserSession(existingUser.ID)
+	if err != nil {
+		// session doesn't exist, create it
+		err = h.store.UserRepository().CreateUserSession(existingUser.ID, token)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user session: %w", err))
+			return
+		}
+	} else {
+		// session exists, update it
+		err = h.store.UserRepository().UpdateUserSession(existingUser.ID, token)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to update user session: %w", err))
+			return
+		}
+	}
+
+	http.Redirect(w, r, appRedirectURL, http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
@@ -68,62 +123,183 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing access token"))
 		return
 	}
+	refreshToken := r.Header.Get("refresh_token")
+	if refreshToken == "" {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing refresh token"))
+		return
+	}
 
-	// validate the access token
 	token, err := h.services.AuthService.Google.TokenSource(r.Context(), &oauth2.Token{
-		AccessToken: accessToken,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}).Token()
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusUnauthorized, fmt.Errorf("failed to validate token: %w", err))
 		return
 	}
 
-	if !token.Valid() {
-		// TODO: fetch the user using provided access token
-		// TODO: use the refresh token in the database to get a new access token
+	// check if the token is valid
+	if !tokenValid(token) {
 		token, err := h.services.AuthService.Google.TokenSource(r.Context(), &oauth2.Token{
-			// this should be the refresh token saved in the database
-			RefreshToken: token.RefreshToken,
+			RefreshToken: refreshToken,
 		}).Token()
-
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get new access token: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get new access token: %w", err))
 			return
 		}
-
-		// TODO: save the new refresh token and access token in the database
-		_ = token.RefreshToken
-		// w.Header().Set("Authorization", token.AccessToken)
-
+		// get user info
+		userInfo, err := getUserInfo(r, h.services.AuthService.Google, token, h.appConfig.GoogleUserInfoURL)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusBadRequest, err)
+			return
+		}
+		// get user from database
+		user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user by email: %w", err))
+			return
+		}
+		// get user session
+		_, err = h.store.UserRepository().GetUserSession(user.ID)
+		if err != nil {
+			// user session doesn't exist, create it
+			err = h.store.UserRepository().CreateUserSession(user.ID, token)
+			if err != nil {
+				utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user session: %w", err))
+			}
+		} else {
+			// user session exists, update it
+			err = h.store.UserRepository().UpdateUserSession(user.ID, token)
+			if err != nil {
+				utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to update user session: %w", err))
+				return
+			}
+		}
+		headers := map[string]string{
+			"access_token":  token.AccessToken,
+			"refresh_token": token.RefreshToken,
+		}
+		utils.WriteJSON(w, http.StatusOK, user, headers)
+		return
 	}
 
-	client := h.services.AuthService.Google.Client(r.Context(), token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	// get user info
+	userInfo, err := getUserInfo(r, h.services.AuthService.Google, token, h.appConfig.GoogleUserInfoURL)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get user info: %w", err))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
-	defer resp.Body.Close()
 
-	var userData map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&userData); err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to decode user info: %w", err))
+	// get user from db
+	user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user by email: %w", err))
 		return
 	}
+
 	headers := map[string]string{
-		"access_token": token.AccessToken,
+		"access_token":  token.AccessToken,
+		"refresh_token": refreshToken,
 	}
-	utils.WriteJSON(w, http.StatusOK, userData, headers)
-
+	utils.WriteJSON(w, http.StatusOK, user, headers)
 }
 
 func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	var user *models.User
+	accessToken := r.Header.Get("access_token")
+	refreshToken := r.Header.Get("refresh_token")
+
+	if accessToken == "" && refreshToken == "" {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing token"))
+		return
+	}
+
+	if refreshToken != "" {
+		userInfo, err := getUserInfo(r, h.services.AuthService.Google, &oauth2.Token{RefreshToken: refreshToken}, h.appConfig.GoogleUserInfoURL)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get user info: %w", err))
+			return
+		}
+		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user info: %w", err))
+			return
+		}
+		if err := revokeToken(refreshToken, h.appConfig.GoogleRevokeURL); err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to revoke token: %w", err))
+			return
+		}
+	}
+
+	if accessToken != "" {
+		userInfo, err := getUserInfo(r, h.services.AuthService.Google, &oauth2.Token{AccessToken: accessToken}, h.appConfig.GoogleUserInfoURL)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to get user info: %w", err))
+			return
+		}
+		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user info: %w", err))
+			return
+		}
+		if err := revokeToken(accessToken, h.appConfig.GoogleRevokeURL); err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to revoke token: %w", err))
+			return
+		}
+	}
+
+	if err := h.store.UserRepository().DeleteUserSession(user.ID); err != nil {
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to delete user session: %w", err))
+		return
+	}
 	utils.ClearSession(w, r, "verifier")
 	utils.ClearSession(w, r, "state")
-	w.WriteHeader(http.StatusOK)
-	// remove the refresh token and access token from the database
-	// redirect to login
-	w.Header().Set("Location", "/auth/login")
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	utils.WriteJSON(w, http.StatusNoContent, nil, nil)
+}
 
+func revokeToken(token, googleRevokeURL string) error {
+	url := fmt.Sprintf("%s?token=%s", googleRevokeURL, token)
+	fmt.Printf("revoke url: %s\n", url)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to revoke token, status code: %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func getUserInfo(r *http.Request, oAuth2config *oauth2.Config, token *oauth2.Token, googleUserInfoUrl string) (models.GoogleUserInfo, error) {
+	client := oAuth2config.Client(r.Context(), token)
+	resp, err := client.Get(googleUserInfoUrl)
+	if err != nil {
+		return models.GoogleUserInfo{}, fmt.Errorf("failed to get user info: %w", err)
+	}
+	defer resp.Body.Close()
+	userInfo := models.GoogleUserInfo{}
+	err = utils.DecodeResponseBody(resp.Body, &userInfo)
+	if err != nil {
+		return models.GoogleUserInfo{}, fmt.Errorf("failed to decode user info: %w", err)
+	}
+	return userInfo, nil
+}
+
+func generateAppRedirectURL(appURL string, accessToken, refreshToken string) string {
+	if refreshToken == "" {
+		return fmt.Sprintf("%s?access_token=%s", appURL, accessToken)
+	}
+	return fmt.Sprintf("%s?access_token=%s&refresh_token=%s", appURL, accessToken, refreshToken)
+}
+
+func tokenValid(token *oauth2.Token) bool {
+	if token == nil {
+		return false
+	}
+	return token.Valid() && token.Expiry.After(time.Now())
 }

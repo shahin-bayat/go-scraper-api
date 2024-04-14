@@ -45,3 +45,7 @@ func DecodeRequestBody(r *http.Request, v interface{}) error {
 	defer r.Body.Close()
 	return decoder.Decode(v)
 }
+
+func DecodeResponseBody(body io.ReadCloser, v interface{}) error {
+	return json.NewDecoder(body).Decode(v)
+}
