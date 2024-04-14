@@ -26,7 +26,7 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 		r.Get("/auth/{provider}/user-info", handlers.GetUserInfo)
 		r.Get("/auth/{provider}/login", handlers.HandleProviderLogin)
 		r.Get("/auth/{provider}/callback", handlers.HandleProviderCallback)
-		r.Get("/auth/{provider}/logout", handlers.HandleLogout)
+		r.Post("/auth/{provider}/logout", handlers.HandleLogout)
 
 		r.Get("/payment/config", handlers.HandlePaymentConfig)
 		r.Post("/payment/webhook", handlers.HandlePaymentWebhook)
