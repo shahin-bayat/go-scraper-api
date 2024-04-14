@@ -41,6 +41,7 @@ type AppConfig struct {
 	GoogleClientSecret   string
 	GoogleRedirectURL    string
 	GoogleUserInfoURL    string
+	GoogleRevokeURL      string
 }
 
 func init() {
@@ -72,6 +73,7 @@ func init() {
 		GoogleClientSecret:   getStringEnv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:    getStringEnv("GOOGLE_REDIRECT_URL"),
 		GoogleUserInfoURL:    getStringEnv("GOOGLE_USER_INFO_URL"),
+		GoogleRevokeURL:      getStringEnv("GOOGLE_REVOKE_URL"),
 	}
 
 }

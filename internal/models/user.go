@@ -22,7 +22,7 @@ type User struct {
 	Locale        string     `json:"locale" db:"locale"`
 	AvatarURL     string     `json:"avatar_url" db:"avatar_url"`
 	VerifiedEmail bool       `json:"verified_email" db:"verified_email"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
-	DeletedAt     *time.Time `json:"deleted_at" db:"deleted_at"`
+	CreatedAt     time.Time  `json:"-" db:"created_at"`
+	UpdatedAt     time.Time  `json:"-" db:"updated_at"`
+	DeletedAt     *time.Time `json:"-" db:"deleted_at"`
 }

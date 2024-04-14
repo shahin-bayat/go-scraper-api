@@ -108,6 +108,15 @@ func (ur *UserRepository) UpdateUserSession(userId uint, token *oauth2.Token) er
 	return nil
 }
 
+func (ur *UserRepository) DeleteUserSession(userId uint) error {
+	redisKey := fmt.Sprintf("user:%d", userId)
+	err := ur.redis.Del(context.Background(), redisKey).Err()
+	if err != nil {
+		return fmt.Errorf("failed to delete user session: %w", err)
+	}
+	return nil
+}
+
 func (ur *UserRepository) CreateUser(user *models.User) (uint, error) {
 	var newUserId uint
 	ur.db.QueryRow("INSERT INTO users (email, given_name, family_name, name, locale, avatar_url, verified_email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", user.Email, user.GivenName, user.FamilyName, user.Name, user.Locale, user.AvatarURL, user.VerifiedEmail).Scan(&newUserId)
