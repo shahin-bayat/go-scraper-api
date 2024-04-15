@@ -22,7 +22,7 @@ func (h *Handler) HandleProviderLogin(w http.ResponseWriter, r *http.Request) {
 	verifier := oauth2.GenerateVerifier()
 	state, err := utils.GenerateRandomString(32)
 	if err != nil {
-		http.Error(w, "Failed to generate random string", http.StatusInternalServerError)
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, h.services.AuthService.ErrorGenerateAuthState())
 		return
 	}
 	utils.SetSession(w, r, "verifier", verifier)
@@ -42,19 +42,19 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 	sessionState := utils.GetSession(r, "state")
 
 	if state != sessionState {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("state does not match"))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.services.AuthService.ErrorAuthStateMissmatch())
 		return
 	}
 
 	token, err := h.services.AuthService.ExchangeToken(r.Context(), code, verifier)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("failed to exchange token: %w", err))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
 
 	appRedirectURL := generateAppRedirectURL(h.appConfig.AppUniversalURL, token.AccessToken, token.RefreshToken)
 
-	userInfo, err := h.services.AuthService.GetUserInfo(r.Context(), token)
+	userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
@@ -76,14 +76,13 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		// create the user in the database
 		userId, err := h.store.UserRepository().CreateUser(&newUser)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user: %w",
-				err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 		// create the session in Redis
 		err = h.store.UserRepository().CreateUserSession(userId, token)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user session: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 		http.Redirect(w, r, appRedirectURL, http.StatusTemporaryRedirect)
@@ -97,14 +96,14 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 		// session doesn't exist, create it
 		err = h.store.UserRepository().CreateUserSession(existingUser.ID, token)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user session: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 	} else {
 		// session exists, update it
 		err = h.store.UserRepository().UpdateUserSession(existingUser.ID, token)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to update user session: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 	}
@@ -118,80 +117,85 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
 
 	accessToken := r.Header.Get("access_token")
-	if accessToken == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing access token"))
-		return
-	}
 	refreshToken := r.Header.Get("refresh_token")
-	if refreshToken == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing refresh token"))
+
+	if accessToken == "" && refreshToken == "" {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.services.AuthService.ErrorMissingAuthorizationHeader())
 		return
 	}
 
-	token, err := h.services.AuthService.TokenSource(r.Context(), &oauth2.Token{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}).Token()
+	token, err := h.services.AuthService.Token(r.Context(), &oauth2.Token{
+		AccessToken: accessToken,
+	})
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusUnauthorized, fmt.Errorf("failed to validate token: %w", err))
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	// check if the token is valid
-	if !h.services.AuthService.TokenValid(token) {
-		token, err := h.services.AuthService.TokenSource(r.Context(), &oauth2.Token{
-			RefreshToken: refreshToken,
-		}).Token()
-		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get new access token: %w", err))
+	userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
+	if err != nil {
+		if err == h.services.AuthService.ErrorDecodeUserInfo() {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
-		}
-
-		userInfo, err := h.services.AuthService.GetUserInfo(r.Context(), token)
-		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-			return
-		}
-		// get user from database
-		user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
-		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user by email: %w", err))
-			return
-		}
-		// get user session
-		_, err = h.store.UserRepository().GetUserSession(user.ID)
-		if err != nil {
-			// user session doesn't exist, create it
-			err = h.store.UserRepository().CreateUserSession(user.ID, token)
-			if err != nil {
-				utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to create user session: %w", err))
-			}
 		} else {
-			// user session exists, update it
-			err = h.store.UserRepository().UpdateUserSession(user.ID, token)
-			if err != nil {
-				utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to update user session: %w", err))
+			// access token is invalid
+			if refreshToken == "" {
+				utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 				return
 			}
+			// refresh the token
+			token, err := h.services.AuthService.Token(r.Context(), &oauth2.Token{
+				RefreshToken: refreshToken,
+			})
+			if err != nil {
+				utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
+				return
+			}
+			userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
+			// refresh token is invalid
+			if err != nil {
+				if err == h.services.AuthService.ErrorDecodeUserInfo() {
+					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+				} else {
+					utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
+					return
+				}
+			}
+			// get user from database
+			user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
+			if err != nil {
+				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+				return
+			}
+			// get user session
+			_, err = h.store.UserRepository().GetUserSession(user.ID)
+			if err != nil {
+				// user session doesn't exist, create it
+				err = h.store.UserRepository().CreateUserSession(user.ID, token)
+				if err != nil {
+					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+				}
+			} else {
+				// user session exists, update it
+				err = h.store.UserRepository().UpdateUserSession(user.ID, token)
+				if err != nil {
+					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+					return
+				}
+			}
+			headers := map[string]string{
+				"access_token":  token.AccessToken,
+				"refresh_token": token.RefreshToken,
+			}
+			utils.WriteJSON(w, http.StatusOK, user, headers)
+			return
 		}
-		headers := map[string]string{
-			"access_token":  token.AccessToken,
-			"refresh_token": token.RefreshToken,
-		}
-		utils.WriteJSON(w, http.StatusOK, user, headers)
-		return
-	}
-
-	userInfo, err := h.services.AuthService.GetUserInfo(r.Context(), token)
-	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
 	}
 
 	// get user from db
 	user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user by email: %w", err))
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -208,46 +212,52 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	refreshToken := r.Header.Get("refresh_token")
 
 	if accessToken == "" && refreshToken == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("missing token"))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.services.AuthService.ErrorMissingAuthorizationHeader())
 		return
 	}
 
 	if refreshToken != "" {
-		userInfo, err := h.services.AuthService.GetUserInfo(r.Context(), &oauth2.Token{RefreshToken: refreshToken})
+		userInfo, err := h.services.AuthService.ValidateToken(r.Context(), &oauth2.Token{RefreshToken: refreshToken})
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusBadRequest, err)
+			if err == h.services.AuthService.ErrorDecodeUserInfo() {
+				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+				return
+			}
+			utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
 			return
 		}
 		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user info: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 		if err := h.services.AuthService.RevokeToken(refreshToken); err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to revoke token: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
-	}
-
-	if accessToken != "" {
-		userInfo, err := h.services.AuthService.GetUserInfo(r.Context(), &oauth2.Token{AccessToken: accessToken})
+	} else {
+		userInfo, err := h.services.AuthService.ValidateToken(r.Context(), &oauth2.Token{AccessToken: accessToken})
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusBadRequest, err)
+			if err == h.services.AuthService.ErrorDecodeUserInfo() {
+				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+				return
+			}
+			utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
 			return
 		}
 		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to get user info: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 		if err := h.services.AuthService.RevokeToken(accessToken); err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to revoke token: %w", err))
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 	}
 
 	if err := h.store.UserRepository().DeleteUserSession(user.ID); err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to delete user session: %w", err))
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
 	}
 	utils.ClearSession(w, r, "verifier")

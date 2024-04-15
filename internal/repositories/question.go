@@ -51,6 +51,31 @@ func (qr *QuestionRepository) GetCategoryDetail(categoryId int) ([]models.Catego
 	return categoryDetailResponse, nil
 }
 
+func (qr *QuestionRepository) GetFreeCategoryDetail(categoryId int, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error) {
+	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
+	rows, err := qr.db.Queryx(`
+			SELECT q.question_number, q.id 
+			FROM category_questions AS cq 
+			JOIN questions AS q ON cq.question_id = q.id 
+			WHERE category_id = $1 AND q.id IN ($2, $3, $4)
+			ORDER BY q.id ASC
+	`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2])
+	if err != nil {
+		return nil, fmt.Errorf("error getting category detail: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cdr models.CategoryDetailResponse
+		err := rows.StructScan(&cdr)
+		if err != nil {
+			return nil, fmt.Errorf("error getting category detail: %w", err)
+		}
+		categoryDetailResponse = append(categoryDetailResponse, cdr)
+	}
+	return categoryDetailResponse, nil
+}
+
 func (qr *QuestionRepository) GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
 
 	var questionTranslation models.Translation

@@ -34,3 +34,12 @@ func StringInSlice(slice []string, str string) bool {
 func TrimSpaceLower(str string) string {
 	return strings.TrimSpace(strings.ToLower(str))
 }
+
+func UintInSlice(slice []uint, value uint) bool {
+	for _, item := range slice {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}

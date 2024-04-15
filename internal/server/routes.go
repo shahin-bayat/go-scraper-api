@@ -9,6 +9,7 @@ import (
 
 	"github.com/shahin-bayat/scraper-api/internal/config"
 	"github.com/shahin-bayat/scraper-api/internal/handlers"
+	"github.com/shahin-bayat/scraper-api/internal/middlewares"
 	"github.com/shahin-bayat/scraper-api/internal/services"
 	"github.com/shahin-bayat/scraper-api/internal/store"
 )
@@ -16,6 +17,7 @@ import (
 func RegisterRoutes(store store.Store, services *services.Services, appConfig *config.AppConfig) http.Handler {
 	r := chi.NewRouter()
 	handlers := handlers.New(store, services, appConfig)
+	middlewares := middlewares.NewMiddlewares(services.AuthService, store)
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -33,7 +35,7 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 		r.Post("/payment/intent", handlers.HandlePaymentIntent)
 
 		r.Group(func(r chi.Router) {
-			// r.Use(handlers.AuthMiddleware)
+			r.Use(middlewares.Auth)
 			r.Route("/category", func(r chi.Router) {
 				r.Get("/", handlers.GetCategories)
 				r.Get("/{categoryId}", handlers.GetCategoryDetail)
