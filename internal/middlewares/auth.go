@@ -2,10 +2,14 @@ package middlewares
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
 
 	"golang.org/x/oauth2"
+)
+
+var (
+	ErrorUserNotAuthorized = errors.New("user is not authorized")
 )
 
 type contextKey string
@@ -27,38 +31,78 @@ func (am *Middlewares) Auth(next http.Handler) http.Handler {
 			return
 		}
 
-		token, err := am.authService.TokenSource(r.Context(), &oauth2.Token{AccessToken: accessToken, RefreshToken: refreshToken}).Token()
+		token, err := am.authService.Token(r.Context(), &oauth2.Token{AccessToken: accessToken})
 		if err != nil {
 			ctx = context.WithValue(ctx, User, nil)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
-		if !am.authService.TokenValid(token) {
-			token, err = am.authService.TokenSource(r.Context(), &oauth2.Token{
+		userInfo, err := am.authService.ValidateToken(r.Context(), token)
+		// access token is invalid
+		if err != nil {
+			if err == am.authService.ErrorDecodeUserInfo() {
+				ctx = context.WithValue(ctx, User, nil)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			// refresh the token
+			if refreshToken == "" {
+				ctx = context.WithValue(ctx, User, nil)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			token, err = am.authService.Token(r.Context(), &oauth2.Token{
 				RefreshToken: refreshToken,
-			}).Token()
+			})
 			if err != nil {
 				ctx = context.WithValue(ctx, User, nil)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-		}
+			userInfo, err = am.authService.ValidateToken(r.Context(), token)
+			// refresh token is invalid
+			if err != nil {
+				ctx = context.WithValue(ctx, User, nil)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 
-		userInfo, err := am.authService.GetUserInfo(r.Context(), token)
-		if err != nil {
-			ctx = context.WithValue(ctx, User, nil)
+			user, err := am.store.UserRepository().GetUserByEmail(userInfo.Email)
+			if err != nil {
+				ctx = context.WithValue(ctx, User, nil)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			_, err = am.store.UserRepository().GetUserSession(user.ID)
+			if err != nil {
+				err = am.store.UserRepository().CreateUserSession(user.ID, token)
+				if err != nil {
+					ctx = context.WithValue(ctx, User, nil)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+				ctx = context.WithValue(ctx, User, user.ID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			err = am.store.UserRepository().UpdateUserSession(user.ID, token)
+			if err != nil {
+				ctx = context.WithValue(ctx, User, nil)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			ctx = context.WithValue(ctx, User, user.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-
 		user, err := am.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
 			ctx = context.WithValue(ctx, User, nil)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-
 		ctx = context.WithValue(ctx, User, user.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -66,7 +110,7 @@ func (am *Middlewares) Auth(next http.Handler) http.Handler {
 
 func GetUserIdFromContext(ctx context.Context) (uint, error) {
 	if ctx.Value(User) == nil {
-		return 0, fmt.Errorf("user is not authorized")
+		return 0, ErrorUserNotAuthorized
 	}
 	userId := ctx.Value(User).(uint)
 	return userId, nil
