@@ -8,8 +8,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/shahin-bayat/scraper-api/internal/middlewares"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 )
+
+var freeQuestionIds = [3]uint{14, 50, 55}
 
 func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	categories, err := h.store.QuestionRepository().GetCategories()
@@ -29,6 +32,17 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 	uintCategoryId, err := strconv.Atoi(categoryId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
+		return
+	}
+
+	_, err = middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		category, err := h.store.QuestionRepository().GetFreeCategoryDetail(uintCategoryId, freeQuestionIds)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusNotFound, err)
+			return
+		}
+		utils.WriteJSON(w, http.StatusOK, category, nil)
 		return
 	}
 
@@ -60,6 +74,14 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
+	}
+
+	_, err = middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		if !utils.UintInSlice(freeQuestionIds[:], uint(uintQuestionId)) {
+			utils.WriteErrorJSON(w, http.StatusUnauthorized, fmt.Errorf("user is not authorized to view this question"))
+			return
+		}
 	}
 
 	question, err := h.store.QuestionRepository().GetQuestionDetail(uintQuestionId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL)

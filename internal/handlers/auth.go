@@ -227,9 +227,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 			utils.WriteErrorJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to revoke token: %w", err))
 			return
 		}
-	}
-
-	if accessToken != "" {
+	} else {
 		userInfo, err := h.services.AuthService.GetUserInfo(r.Context(), &oauth2.Token{AccessToken: accessToken})
 		if err != nil {
 			utils.WriteErrorJSON(w, http.StatusBadRequest, err)
