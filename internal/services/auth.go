@@ -23,6 +23,7 @@ var (
 	ErrorMissingToken               = errors.New("token is missing")
 	ErrorGenerateAuthState          = errors.New("failed to generate auth state")
 	ErrorAuthStateMissmatch         = errors.New("auth state missmatch")
+	ErrorUnauthorized               = errors.New("user is not authorized")
 )
 
 type AuthService interface {
@@ -37,6 +38,7 @@ type AuthService interface {
 	ErrorMissingAuthorizationHeader() error
 	ErrorGenerateAuthState() error
 	ErrorAuthStateMissmatch() error
+	ErrorUnauthorized() error
 }
 
 type authService struct {
@@ -141,4 +143,8 @@ func (as *authService) ErrorGenerateAuthState() error {
 
 func (as *authService) ErrorAuthStateMissmatch() error {
 	return ErrorAuthStateMissmatch
+}
+
+func (as *authService) ErrorUnauthorized() error {
+	return ErrorUnauthorized
 }
