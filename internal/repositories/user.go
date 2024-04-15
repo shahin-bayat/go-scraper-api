@@ -23,16 +23,25 @@ var (
 	ErrorGetUserByEmail    = errors.New("failed to get user by email")
 )
 
-type UserRepository struct {
+type UserRepository interface {
+	GetUserSession(userId uint) (*oauth2.Token, error)
+	CreateUserSession(userID uint, token *oauth2.Token) error
+	UpdateUserSession(userId uint, token *oauth2.Token) error
+	DeleteUserSession(userId uint) error
+	CreateUser(user *models.User) (uint, error)
+	GetUserByEmail(email string) (*models.User, error)
+}
+
+type userRepository struct {
 	db    *sqlx.DB
 	redis *redis.Client
 }
 
-func NewUserRepository(db *sqlx.DB, redis *redis.Client) *UserRepository {
-	return &UserRepository{db: db, redis: redis}
+func NewUserRepository(db *sqlx.DB, redis *redis.Client) UserRepository {
+	return &userRepository{db: db, redis: redis}
 }
 
-func (ur *UserRepository) GetUserSession(userId uint) (*oauth2.Token, error) {
+func (ur *userRepository) GetUserSession(userId uint) (*oauth2.Token, error) {
 	at, err := ur.redis.HGet(context.Background(), fmt.Sprintf("user:%d", userId), "access_token").Result()
 	if err != nil {
 		return nil, ErrorGetUserSession
@@ -64,7 +73,7 @@ func (ur *UserRepository) GetUserSession(userId uint) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func (ur *UserRepository) CreateUserSession(userID uint, token *oauth2.Token) error {
+func (ur *userRepository) CreateUserSession(userID uint, token *oauth2.Token) error {
 	if token == nil {
 		return ErrorMissingToken
 	}
@@ -90,7 +99,7 @@ func (ur *UserRepository) CreateUserSession(userID uint, token *oauth2.Token) er
 	return nil
 }
 
-func (ur *UserRepository) UpdateUserSession(userId uint, token *oauth2.Token) error {
+func (ur *userRepository) UpdateUserSession(userId uint, token *oauth2.Token) error {
 	if token == nil {
 		return ErrorMissingToken
 	}
@@ -117,7 +126,7 @@ func (ur *UserRepository) UpdateUserSession(userId uint, token *oauth2.Token) er
 	return nil
 }
 
-func (ur *UserRepository) DeleteUserSession(userId uint) error {
+func (ur *userRepository) DeleteUserSession(userId uint) error {
 	redisKey := fmt.Sprintf("user:%d", userId)
 	err := ur.redis.Del(context.Background(), redisKey).Err()
 	if err != nil {
@@ -126,7 +135,7 @@ func (ur *UserRepository) DeleteUserSession(userId uint) error {
 	return nil
 }
 
-func (ur *UserRepository) CreateUser(user *models.User) (uint, error) {
+func (ur *userRepository) CreateUser(user *models.User) (uint, error) {
 	var newUserId uint
 	err := ur.db.QueryRow("INSERT INTO users (email, given_name, family_name, name, locale, avatar_url, verified_email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", user.Email, user.GivenName, user.FamilyName, user.Name, user.Locale, user.AvatarURL, user.VerifiedEmail).Scan(&newUserId)
 	if err != nil {
@@ -135,7 +144,7 @@ func (ur *UserRepository) CreateUser(user *models.User) (uint, error) {
 	return newUserId, nil
 }
 
-func (ur *UserRepository) GetUserByEmail(email string) (*models.User, error) {
+func (ur *userRepository) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := ur.db.Get(&user, "SELECT * FROM users WHERE email = $1", email)
 	if err != nil {

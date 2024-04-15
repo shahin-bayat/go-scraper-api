@@ -7,19 +7,23 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type HealthRepository struct {
+type HealthRepository interface {
+	HealthCheck(ctx context.Context) error
+}
+
+type healthRepository struct {
 	db    *sqlx.DB
 	redis *redis.Client
 }
 
-func NewHealthRepository(db *sqlx.DB, redis *redis.Client) *HealthRepository {
-	return &HealthRepository{
+func NewHealthRepository(db *sqlx.DB, redis *redis.Client) HealthRepository {
+	return &healthRepository{
 		db:    db,
 		redis: redis,
 	}
 }
 
-func (hr *HealthRepository) HealthCheck(ctx context.Context) error {
+func (hr *healthRepository) HealthCheck(ctx context.Context) error {
 	if err := hr.db.PingContext(ctx); err != nil {
 		return err
 	}
