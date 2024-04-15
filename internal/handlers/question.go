@@ -26,7 +26,7 @@ func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 	categoryId := chi.URLParam(r, "categoryId")
 	if categoryId == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("category id is required"))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorMissingCategoryId())
 		return
 	}
 	uintCategoryId, err := strconv.Atoi(categoryId)
@@ -62,12 +62,12 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 	lang := r.URL.Query().Get("lang")
 
 	if lang != "" && !utils.StringInSlice(SupportedLanguages, lang) {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("language not supported"))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorUnsupportedLanguage())
 		return
 	}
 
 	if questionId == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("category id and question id are required"))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorMissingQuestionId())
 		return
 	}
 	uintQuestionId, err := strconv.Atoi(questionId)
@@ -79,7 +79,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 	_, err = middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
 		if !utils.UintInSlice(freeQuestionIds[:], uint(uintQuestionId)) {
-			utils.WriteErrorJSON(w, http.StatusUnauthorized, fmt.Errorf("user is not authorized to view this question"))
+			utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
 			return
 		}
 	}
@@ -96,14 +96,14 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")
 	if filename == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, fmt.Errorf("filename is required"))
+		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorMissingFilename())
 		return
 	}
 	filenameSanitized := filepath.Clean(filename)
 	filepath := fmt.Sprintf("assets/images/%s", filenameSanitized)
 	_, err := os.Stat(filepath)
 	if os.IsNotExist(err) {
-		utils.WriteErrorJSON(w, http.StatusNotFound, fmt.Errorf("file not found"))
+		utils.WriteErrorJSON(w, http.StatusNotFound, h.store.QuestionRepository().ErrorFileNotFound())
 		return
 	} else if err != nil {
 		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
