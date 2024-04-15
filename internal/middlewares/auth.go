@@ -67,6 +67,8 @@ func (am *Middlewares) Auth(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
+			w.Header().Add("access_token", token.AccessToken)
+			w.Header().Add("refresh_token", token.RefreshToken)
 
 			user, err := am.store.UserRepository().GetUserByEmail(userInfo.Email)
 			if err != nil {
