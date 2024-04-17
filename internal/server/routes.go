@@ -38,14 +38,18 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 			r.Group(
 				func(r chi.Router) {
 					r.Use(middlewares.Auth)
-					r.Get("/supported-languages", handlers.GetSupportedLanguages)
 					r.Route(
 						"/category", func(r chi.Router) {
 							r.Get("/", handlers.GetCategories)
 							r.Get("/{categoryId}", handlers.GetCategoryDetail)
 						},
 					)
-					r.Get("/question/{questionId}", handlers.GetQuestionDetail)
+					r.Route(
+						"/question", func(r chi.Router) {
+							r.Get("/{questionId}", handlers.GetQuestionDetail)
+							r.Get("/supported-languages", handlers.GetSupportedLanguages)
+						},
+					)
 					r.Get("/image/{filename}", handlers.GetImage)
 				},
 			)
