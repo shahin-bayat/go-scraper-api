@@ -31,6 +31,11 @@ func StringInSlice(slice []string, str string) bool {
 	return false
 }
 
+func KeyInMap(m map[string]string, key string) bool {
+	_, ok := m[key]
+	return ok
+}
+
 func TrimSpaceLower(str string) string {
 	return strings.TrimSpace(strings.ToLower(str))
 }
