@@ -41,7 +41,9 @@ type translationResponse struct {
 
 func main() {
 
-	connStrLocal := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDatabase)
+	connStrLocal := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDatabase,
+	)
 	// connectStrDev := os.Getenv("PG_DEV_URL")
 	// connStrProd := os.Getenv("PG_PROD_URL")
 
@@ -63,18 +65,20 @@ func main() {
 }
 
 func translateQuestions(client *http.Client, deeplAPIKey, connStr, lang string) {
-	questions := []question{}
+	var questions []question
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		fmt.Println("failed to connect to database:", err)
 		return
 	}
 
-	err = db.Select(&questions, `
+	err = db.Select(
+		&questions, `
 			SELECT q.id , i.extracted_text 
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
-	`)
+	`,
+	)
 
 	if err != nil {
 		fmt.Println("failed to get local questions:", err)
@@ -126,25 +130,29 @@ func translateQuestions(client *http.Client, deeplAPIKey, connStr, lang string) 
 
 		t := translationResponse.Translations[0].Text
 
-		db.MustExec(`
+		db.MustExec(
+			`
 			INSERT INTO translations (refer_id, type, lang, translation)
 			VALUES ($1, $2, $3, $4)
-		`, q.ID, "question", "en", t)
+		`, q.ID, "question", "en", t,
+		)
 	}
 }
 
 func translateAnswers(client *http.Client, deeplAPIKey, connStr, lang string) {
-	answers := []answer{}
+	var answers []answer
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		fmt.Println("failed to connect to database:", err)
 		return
 	}
 
-	err = db.Select(&answers, `
+	err = db.Select(
+		&answers, `
 			SELECT id, text 
 			FROM answers
-	`)
+	`,
+	)
 
 	if err != nil {
 		fmt.Println("failed to get local questions:", err)
@@ -196,9 +204,11 @@ func translateAnswers(client *http.Client, deeplAPIKey, connStr, lang string) {
 
 		t := translationResponse.Translations[0].Text
 
-		db.MustExec(`
+		db.MustExec(
+			`
 			INSERT INTO translations (refer_id, type, lang, translation)
 			VALUES ($1, $2, $3, $4)
-		`, a.ID, "answer", "en", t)
+		`, a.ID, "answer", "en", t,
+		)
 	}
 }

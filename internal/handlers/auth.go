@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -124,9 +125,11 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.services.AuthService.Token(r.Context(), &oauth2.Token{
-		AccessToken: accessToken,
-	})
+	token, err := h.services.AuthService.Token(
+		r.Context(), &oauth2.Token{
+			AccessToken: accessToken,
+		},
+	)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
@@ -134,7 +137,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
 	userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
 	if err != nil {
-		if err == h.services.AuthService.ErrorDecodeUserInfo() {
+		if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		} else {
@@ -144,9 +147,11 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// refresh the token
-			token, err := h.services.AuthService.Token(r.Context(), &oauth2.Token{
-				RefreshToken: refreshToken,
-			})
+			token, err := h.services.AuthService.Token(
+				r.Context(), &oauth2.Token{
+					RefreshToken: refreshToken,
+				},
+			)
 			if err != nil {
 				utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
 				return
@@ -154,7 +159,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 			userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
 			// refresh token is invalid
 			if err != nil {
-				if err == h.services.AuthService.ErrorDecodeUserInfo() {
+				if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 				} else {
 					utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
@@ -219,7 +224,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if refreshToken != "" {
 		userInfo, err := h.services.AuthService.ValidateToken(r.Context(), &oauth2.Token{RefreshToken: refreshToken})
 		if err != nil {
-			if err == h.services.AuthService.ErrorDecodeUserInfo() {
+			if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 				return
 			}
@@ -238,7 +243,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	} else {
 		userInfo, err := h.services.AuthService.ValidateToken(r.Context(), &oauth2.Token{AccessToken: accessToken})
 		if err != nil {
-			if err == h.services.AuthService.ErrorDecodeUserInfo() {
+			if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 				return
 			}

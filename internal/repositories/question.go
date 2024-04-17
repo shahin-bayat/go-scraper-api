@@ -53,13 +53,15 @@ func (qr *questionRepository) GetCategories() ([]models.Category, error) {
 
 func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
-	rows, err := qr.db.Queryx(`
+	rows, err := qr.db.Queryx(
+		`
 			SELECT q.question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 
 			ORDER BY q.id ASC
-	`, categoryId)
+	`, categoryId,
+	)
 	if err != nil {
 		return nil, ErrorGetCategoryDetail
 	}
@@ -78,13 +80,15 @@ func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.Catego
 
 func (qr *questionRepository) GetFreeCategoryDetail(categoryId int, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
-	rows, err := qr.db.Queryx(`
+	rows, err := qr.db.Queryx(
+		`
 			SELECT q.question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 AND q.id IN ($2, $3, $4)
 			ORDER BY q.id ASC
-	`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2])
+	`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2],
+	)
 	if err != nil {
 		return nil, ErrorGetCategoryDetail
 	}
@@ -107,12 +111,14 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 	var answersTranslation []models.Translation
 	var response models.QuestionDetailResponse
 
-	err := qr.db.Get(&response, `
+	err := qr.db.Get(
+		&response, `
 			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
 			WHERE q.id = $1
-	`, questionId)
+	`, questionId,
+	)
 
 	if err != nil {
 		return models.QuestionDetailResponse{}, ErrorGetQuestionDetail
@@ -121,11 +127,13 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 	response.FileURL = fmt.Sprintf("%s/image/%s", apiBaseUrl, response.Filename)
 
 	var answers []models.Answer
-	err = qr.db.Select(&answers, `
+	err = qr.db.Select(
+		&answers, `
 				SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
 				FROM answers
 				WHERE question_id = $1
-		`, questionId)
+		`, questionId,
+	)
 	if err != nil {
 		return models.QuestionDetailResponse{}, ErrorGetQuestionAnswers
 	}
@@ -133,17 +141,21 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 	response.Answers = answers
 
 	if lang != "" {
-		err = qr.db.Get(&questionTranslation, `
+		err = qr.db.Get(
+			&questionTranslation, `
 			SELECT * from translations
 			WHERE refer_id = $1 AND type = $2 AND lang = $3
-		`, questionId, models.QuestionType, lang)
+		`, questionId, models.QuestionType, lang,
+		)
 		if err != nil {
 			return models.QuestionDetailResponse{}, ErrorGetAnswersTranslations
 		}
-		err = qr.db.Select(&answersTranslation, `
+		err = qr.db.Select(
+			&answersTranslation, `
 			SELECT * from translations
 			WHERE refer_id IN ($1, $2, $3, $4) AND type = $5 AND lang = $6
-		`, answers[0].ID, answers[1].ID, answers[2].ID, answers[3].ID, models.AnswerType, lang)
+		`, answers[0].ID, answers[1].ID, answers[2].ID, answers[3].ID, models.AnswerType, lang,
+		)
 		if err != nil {
 			return models.QuestionDetailResponse{}, ErrorGetAnswersTranslations
 		}
@@ -152,7 +164,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 
 		for i, answer := range response.Answers {
 			for _, translation := range answersTranslation {
-				if uint(answer.ID) == uint(translation.ReferID) {
+				if answer.ID == uint(translation.ReferID) {
 					response.Answers[i].Text = translation.Translation
 				}
 			}

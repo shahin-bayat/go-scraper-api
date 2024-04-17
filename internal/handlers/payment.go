@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -63,11 +64,9 @@ func (h *Handler) HandlePaymentIntent(w http.ResponseWriter, r *http.Request) {
 
 	pi, err := paymentintent.New(params)
 	if err != nil {
-		if stripeErr, ok := err.(*stripe.Error); ok {
+		var stripeErr *stripe.Error
+		if errors.As(err, &stripeErr) {
 			utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
-			return
-		} else {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 	}
