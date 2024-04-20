@@ -107,8 +107,8 @@ func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filenameSanitized := filepath.Clean(filename)
-	filepath := fmt.Sprintf("assets/images/%s", filenameSanitized)
-	_, err := os.Stat(filepath)
+	filePath := fmt.Sprintf("assets/images/%s", filenameSanitized)
+	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		utils.WriteErrorJSON(w, http.StatusNotFound, h.store.QuestionRepository().ErrorFileNotFound())
 		return

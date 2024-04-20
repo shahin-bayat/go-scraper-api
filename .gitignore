@@ -32,3 +32,6 @@ main
 migrations/backup/*.sql
 migrations/backup/*.dump
 
+# chore
+ .DS_Store
+
