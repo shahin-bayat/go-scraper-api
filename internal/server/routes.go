@@ -51,6 +51,13 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 						},
 					)
 					r.Get("/image/{filename}", handlers.GetImage)
+
+					r.Route(
+						"/subscription", func(r chi.Router) {
+							r.Get("/", handlers.GetSubscriptions)
+							r.Get("/{subscriptionId}", handlers.GetSubscriptionDetail)
+						},
+					)
 				},
 			)
 		},
