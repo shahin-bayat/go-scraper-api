@@ -1,23 +1,21 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
+	"sync"
+	"time"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	c "github.com/shahin-bayat/scraper-api/internal/config"
 )
 
 var (
-	pgDatabase = os.Getenv("PG_DATABASE")
-	pgPassword = os.Getenv("PG_PASSWORD")
-	pgUser     = os.Getenv("PG_USER")
-	pgPort     = os.Getenv("PG_PORT")
-	pgHost     = os.Getenv("PG_HOST")
+	pgDatabase = c.PostgresConf.PgDatabase
+	pgPassword = c.PostgresConf.PgPassword
+	pgUser     = c.PostgresConf.PgUser
+	pgPort     = c.PostgresConf.PgPort
+	pgHost     = c.PostgresConf.PgHost
 )
 
 type question struct {
@@ -40,175 +38,27 @@ type translationResponse struct {
 }
 
 func main() {
+	var wg sync.WaitGroup
 
 	connStrLocal := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDatabase,
 	)
-	// connectStrDev := os.Getenv("PG_DEV_URL")
-	// connStrProd := os.Getenv("PG_PROD_URL")
 
-	deeplAPIKey := os.Getenv("DEEPL_API_KEY")
-	if deeplAPIKey == "" {
-		fmt.Println("DEEPL_API_KEY is not set")
-		return
-	}
+	//connectStrDev := c.AppConf.PostgresDevURL
+	_ = c.AppConf.PostgresProdURL
 
+	deeplAPIKey := c.AppConf.DeeplAPIKey
 	client := http.Client{}
 
-	translateQuestions(&client, deeplAPIKey, connStrLocal, "EN")
-	// translateQuestions(&client, deeplAPIKey, connectStrDev, "EN")
-	// translateQuestions(&client, deeplAPIKey, connStrProd, "EN")
+	start := time.Now()
+	translateQuestions(&client, deeplAPIKey, connStrLocal, "TR", &wg)
+	//translateQuestions(&client, deeplAPIKey, connectStrDev, "TR", &wg)
+	// translateQuestions(&client, deeplAPIKey, connStrProd, "TR", &wg)
 
-	translateAnswers(&client, deeplAPIKey, connStrLocal, "EN")
-	// translateAnswers(&client, deeplAPIKey, connectStrDev, "EN")
-	// translateAnswers(&client, deeplAPIKey, connStrProd, "EN")
-}
+	translateAnswers(&client, deeplAPIKey, connStrLocal, "TR", &wg)
+	//translateAnswers(&client, deeplAPIKey, connectStrDev, "TR", &wg)
+	// translateAnswers(&client, deeplAPIKey, connStrProd, "TR", &wg)
 
-func translateQuestions(client *http.Client, deeplAPIKey, connStr, lang string) {
-	var questions []question
-	db, err := sqlx.Connect("postgres", connStr)
-	if err != nil {
-		fmt.Println("failed to connect to database:", err)
-		return
-	}
-
-	err = db.Select(
-		&questions, `
-			SELECT q.id , i.extracted_text 
-			FROM questions AS q
-			JOIN images AS i ON i.question_id = q.id
-	`,
-	)
-
-	if err != nil {
-		fmt.Println("failed to get local questions:", err)
-		return
-	}
-
-	for _, q := range questions {
-		fmt.Printf("Translating question: %s\n", q.Question)
-		text := q.Question
-		payloadData := map[string]interface{}{
-			"text":        []string{text},
-			"target_lang": lang,
-		}
-
-		payloadBytes, err := json.Marshal(payloadData)
-		if err != nil {
-			fmt.Println("Error encoding payload:", err)
-			return
-		}
-		payload := bytes.NewReader(payloadBytes)
-
-		req, err := http.NewRequest("POST", "https://api-free.deepl.com/v2/translate", payload)
-		if err != nil {
-			fmt.Println("failed to create request:", err)
-			return
-		}
-		req.Header.Set("Authorization", "DeepL-Auth-Key "+deeplAPIKey)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("failed to send request:", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("failed to read response body:", err)
-			return
-		}
-
-		translationResponse := translationResponse{}
-		err = json.Unmarshal(body, &translationResponse)
-		if err != nil {
-			fmt.Println("failed to unmarshal response body:", err)
-			return
-		}
-
-		t := translationResponse.Translations[0].Text
-
-		db.MustExec(
-			`
-			INSERT INTO translations (refer_id, type, lang, translation)
-			VALUES ($1, $2, $3, $4)
-		`, q.ID, "question", "en", t,
-		)
-	}
-}
-
-func translateAnswers(client *http.Client, deeplAPIKey, connStr, lang string) {
-	var answers []answer
-	db, err := sqlx.Connect("postgres", connStr)
-	if err != nil {
-		fmt.Println("failed to connect to database:", err)
-		return
-	}
-
-	err = db.Select(
-		&answers, `
-			SELECT id, text 
-			FROM answers
-	`,
-	)
-
-	if err != nil {
-		fmt.Println("failed to get local questions:", err)
-		return
-	}
-
-	for _, a := range answers {
-		fmt.Printf("Translating answer: %s\n", a.Text)
-		text := a.Text
-		payloadData := map[string]interface{}{
-			"text":        []string{text},
-			"target_lang": lang,
-		}
-
-		payloadBytes, err := json.Marshal(payloadData)
-		if err != nil {
-			fmt.Println("Error encoding payload:", err)
-			return
-		}
-		payload := bytes.NewReader(payloadBytes)
-
-		req, err := http.NewRequest("POST", "https://api-free.deepl.com/v2/translate", payload)
-		if err != nil {
-			fmt.Println("failed to create request:", err)
-			return
-		}
-		req.Header.Set("Authorization", "DeepL-Auth-Key "+deeplAPIKey)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("failed to send request:", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("failed to read response body:", err)
-			return
-		}
-
-		translationResponse := translationResponse{}
-		err = json.Unmarshal(body, &translationResponse)
-		if err != nil {
-			fmt.Println("failed to unmarshal response body:", err)
-			return
-		}
-
-		t := translationResponse.Translations[0].Text
-
-		db.MustExec(
-			`
-			INSERT INTO translations (refer_id, type, lang, translation)
-			VALUES ($1, $2, $3, $4)
-		`, a.ID, "answer", "en", t,
-		)
-	}
+	wg.Wait()
+	fmt.Println("Time elapsed:", time.Since(start))
 }

@@ -42,6 +42,9 @@ type AppConfig struct {
 	GoogleRedirectURL    string
 	GoogleUserInfoURL    string
 	GoogleTokenRevokeURL string
+	DeeplAPIKey          string
+	PostgresDevURL       string
+	PostgresProdURL      string
 }
 
 func init() {
@@ -74,6 +77,9 @@ func init() {
 		GoogleRedirectURL:    getStringEnv("GOOGLE_REDIRECT_URL"),
 		GoogleUserInfoURL:    getStringEnv("GOOGLE_USER_INFO_URL"),
 		GoogleTokenRevokeURL: getStringEnv("GOOGLE_TOKEN_REVOKE_URL"),
+		DeeplAPIKey:          getStringEnv("DEEPL_API_KEY"),
+		PostgresDevURL:       getStringEnv("PG_DEV_URL"),
+		PostgresProdURL:      getStringEnv("PG_PROD_URL"),
 	}
 
 }
