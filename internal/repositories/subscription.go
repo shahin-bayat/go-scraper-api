@@ -15,6 +15,7 @@ var (
 type SubscriptionRepository interface {
 	GetSubscriptions() ([]models.SubscriptionResponse, error)
 	GetSubscriptionDetail(subscriptionId int) (models.Subscription, error)
+	GetSubscriptionById(subscriptionId int) (models.Subscription, error)
 	ErrorMissingSubscriptionId() error
 }
 
@@ -51,6 +52,15 @@ func (sr *subscriptionRepository) GetSubscriptions() ([]models.SubscriptionRespo
 }
 
 func (sr *subscriptionRepository) GetSubscriptionDetail(subscriptionId int) (models.Subscription, error) {
+	var subscription models.Subscription
+	err := sr.db.Get(&subscription, "SELECT * FROM subscriptions WHERE id = $1", subscriptionId)
+	if err != nil {
+		return subscription, ErrorGetSubscriptionDetail
+	}
+	return subscription, nil
+}
+
+func (sr *subscriptionRepository) GetSubscriptionById(subscriptionId int) (models.Subscription, error) {
 	var subscription models.Subscription
 	err := sr.db.Get(&subscription, "SELECT * FROM subscriptions WHERE id = $1", subscriptionId)
 	if err != nil {

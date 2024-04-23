@@ -31,10 +31,6 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 			r.Get("/auth/{provider}/callback", handlers.HandleProviderCallback)
 			r.Post("/auth/{provider}/logout", handlers.HandleLogout)
 
-			r.Get("/payment/config", handlers.HandlePaymentConfig)
-			r.Post("/payment/webhook", handlers.HandlePaymentWebhook)
-			r.Post("/payment/intent", handlers.HandlePaymentIntent)
-
 			r.Group(
 				func(r chi.Router) {
 					r.Use(middlewares.Auth)
@@ -56,6 +52,14 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 						"/subscription", func(r chi.Router) {
 							r.Get("/", handlers.GetSubscriptions)
 							r.Get("/{subscriptionId}", handlers.GetSubscriptionDetail)
+						},
+					)
+
+					r.Route(
+						"/payment", func(r chi.Router) {
+							r.Get("/config", handlers.HandlePaymentConfig)
+							r.Post("/webhook", handlers.HandlePaymentWebhook)
+							r.Post("/intent", handlers.HandlePaymentIntent)
 						},
 					)
 				},

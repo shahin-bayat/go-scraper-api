@@ -5,5 +5,7 @@ type CreateIntentRequest struct {
 }
 
 type CreateIntentResponse struct {
-	ClientSecret string `json:"client_secret"`
+	PaymentIntent string `json:"payment_intent"`
+	//EphemeralKey  string `json:"ephemeral_key"`
+	Customer string `json:"customer"`
 }
