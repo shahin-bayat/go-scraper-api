@@ -22,16 +22,15 @@ func (h *Handler) GetSubscriptionDetail(w http.ResponseWriter, r *http.Request) 
 		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.SubscriptionRepository().ErrorMissingSubscriptionId())
 		return
 	}
-	uintSubscriptionId, err := strconv.Atoi(subscriptionId)
+	intSubscriptionId, err := strconv.Atoi(subscriptionId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
-	subscription, err := h.store.SubscriptionRepository().GetSubscriptionDetail(uintSubscriptionId)
+	subscription, err := h.store.SubscriptionRepository().GetSubscriptionDetail(intSubscriptionId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return
 	}
 	utils.WriteJSON(w, http.StatusOK, subscription, nil)
-
 }
