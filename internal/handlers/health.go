@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/redis/go-redis/v9"
@@ -13,9 +14,9 @@ func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check database health
 	if err := h.store.HealthRepository().HealthCheck(r.Context()); err != nil {
-		if err == sql.ErrConnDone {
+		if errors.Is(err, sql.ErrConnDone) {
 			healthStatus["database"] = "error: database connection closed"
-		} else if err == redis.ErrClosed {
+		} else if errors.Is(err, redis.ErrClosed) {
 			healthStatus["redis"] = "error: redis connection closed"
 		} else {
 			healthStatus["db/redis"] = "error: " + err.Error()

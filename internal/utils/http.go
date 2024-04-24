@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -10,7 +11,7 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func WriteJSON(w http.ResponseWriter, status int, v interface{}, headers map[string]string) error {
+func WriteJSON(w http.ResponseWriter, status int, v interface{}, headers map[string]string) {
 	w.Header().Set("Content-Type", "application/json")
 
 	for key, value := range headers {
@@ -21,14 +22,18 @@ func WriteJSON(w http.ResponseWriter, status int, v interface{}, headers map[str
 		w.Header().Set(key, value)
 	}
 	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func WriteErrorJSON(w http.ResponseWriter, status int, err error) error {
+func WriteErrorJSON(w http.ResponseWriter, status int, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	errorResponse := ErrorResponse{Error: err.Error()}
-	return json.NewEncoder(w).Encode(errorResponse)
+	if err := json.NewEncoder(w).Encode(errorResponse); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func ReadBody(r *http.Request) ([]byte, error) {

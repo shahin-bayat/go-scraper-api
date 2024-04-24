@@ -20,7 +20,8 @@ var (
 	ErrorUpdateUserSession = errors.New("failed to update user session")
 	ErrorDeleteUserSession = errors.New("failed to delete user session")
 	ErrorParseTokenExpiry  = errors.New("failed to parse token expiry time")
-	ErrorGetUserByEmail    = errors.New("failed to get user by email")
+	ErrorGetUser           = errors.New("failed to get user info")
+	ErrorUpdateUser        = errors.New("failed to update user info")
 )
 
 type UserRepository interface {
@@ -30,6 +31,8 @@ type UserRepository interface {
 	DeleteUserSession(userId uint) error
 	CreateUser(user *models.User) (uint, error)
 	GetUserByEmail(email string) (*models.User, error)
+	GetUserById(userId uint) (*models.User, error)
+	UpdateUser(userId uint, user *models.UpdateUserRequest) error
 }
 
 type userRepository struct {
@@ -137,7 +140,10 @@ func (ur *userRepository) DeleteUserSession(userId uint) error {
 
 func (ur *userRepository) CreateUser(user *models.User) (uint, error) {
 	var newUserId uint
-	err := ur.db.QueryRow("INSERT INTO users (email, given_name, family_name, name, locale, avatar_url, verified_email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", user.Email, user.GivenName, user.FamilyName, user.Name, user.Locale, user.AvatarURL, user.VerifiedEmail).Scan(&newUserId)
+	err := ur.db.QueryRow(
+		"INSERT INTO users (email, given_name, family_name, name, locale, avatar_url, verified_email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+		user.Email, user.GivenName, user.FamilyName, user.Name, user.Locale, user.AvatarURL, user.VerifiedEmail,
+	).Scan(&newUserId)
 	if err != nil {
 		return 0, ErrorCreateUser
 	}
@@ -148,7 +154,27 @@ func (ur *userRepository) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := ur.db.Get(&user, "SELECT * FROM users WHERE email = $1", email)
 	if err != nil {
-		return &models.User{}, ErrorGetUserByEmail
+		return &models.User{}, ErrorGetUser
 	}
 	return &user, nil
+}
+
+func (ur *userRepository) GetUserById(userId uint) (*models.User, error) {
+	var user models.User
+	err := ur.db.Get(&user, "SELECT * FROM users WHERE id = $1", userId)
+	if err != nil {
+		return &models.User{}, ErrorGetUser
+	}
+	return &user, nil
+}
+
+func (ur *userRepository) UpdateUser(userId uint, user *models.UpdateUserRequest) error {
+	_, err := ur.db.Exec(
+		"UPDATE users SET stripe_customer_id = $1 WHERE id = $2",
+		user.StripeCustomerID, userId,
+	)
+	if err != nil {
+		return ErrorUpdateUser
+	}
+	return nil
 }

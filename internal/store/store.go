@@ -10,14 +10,16 @@ type Store interface {
 	UserRepository() repositories.UserRepository
 	HealthRepository() repositories.HealthRepository
 	QuestionRepository() repositories.QuestionRepository
+	SubscriptionRepository() repositories.SubscriptionRepository
 }
 
 type store struct {
-	db                 *sqlx.DB
-	redis              *redis.Client
-	userRepository     repositories.UserRepository
-	healthRepository   repositories.HealthRepository
-	questionRepository repositories.QuestionRepository
+	db                     *sqlx.DB
+	redis                  *redis.Client
+	userRepository         repositories.UserRepository
+	healthRepository       repositories.HealthRepository
+	questionRepository     repositories.QuestionRepository
+	subscriptionRepository repositories.SubscriptionRepository
 }
 
 func New(db *sqlx.DB, redis *redis.Client) Store {
@@ -47,4 +49,11 @@ func (s *store) QuestionRepository() repositories.QuestionRepository {
 		s.questionRepository = repositories.NewQuestionRepository(s.db)
 	}
 	return s.questionRepository
+}
+
+func (s *store) SubscriptionRepository() repositories.SubscriptionRepository {
+	if s.subscriptionRepository == nil {
+		s.subscriptionRepository = repositories.NewSubscriptionRepository(s.db)
+	}
+	return s.subscriptionRepository
 }

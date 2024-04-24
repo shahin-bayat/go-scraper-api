@@ -12,7 +12,10 @@ import (
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 )
 
-var freeQuestionIds = [3]uint{14, 50, 55}
+var (
+	freeQuestionIds    = [3]uint{14, 50, 55}
+	supportedLanguages = map[string]string{"en": "English"}
+)
 
 func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	categories, err := h.store.QuestionRepository().GetCategories()
@@ -21,6 +24,10 @@ func (h *Handler) GetCategories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	utils.WriteJSON(w, http.StatusOK, categories, nil)
+}
+
+func (h *Handler) GetSupportedLanguages(w http.ResponseWriter, r *http.Request) {
+	utils.WriteJSON(w, http.StatusOK, supportedLanguages, nil)
 }
 
 func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
@@ -56,12 +63,10 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
-	var SupportedLanguages = []string{"en"}
-
 	questionId := chi.URLParam(r, "questionId")
 	lang := r.URL.Query().Get("lang")
 
-	if lang != "" && !utils.StringInSlice(SupportedLanguages, lang) {
+	if lang != "" && !utils.KeyInMap(supportedLanguages, lang) {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorUnsupportedLanguage())
 		return
 	}
@@ -84,7 +89,9 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	question, err := h.store.QuestionRepository().GetQuestionDetail(uintQuestionId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL)
+	question, err := h.store.QuestionRepository().GetQuestionDetail(
+		uintQuestionId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL,
+	)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return
@@ -100,8 +107,8 @@ func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filenameSanitized := filepath.Clean(filename)
-	filepath := fmt.Sprintf("assets/images/%s", filenameSanitized)
-	_, err := os.Stat(filepath)
+	filePath := fmt.Sprintf("assets/images/%s", filenameSanitized)
+	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		utils.WriteErrorJSON(w, http.StatusNotFound, h.store.QuestionRepository().ErrorFileNotFound())
 		return

@@ -1,8 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
+	"github.com/shahin-bayat/scraper-api/internal/middlewares"
+	"github.com/stripe/stripe-go/customer"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
@@ -45,35 +50,90 @@ func (h *Handler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandlePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+		return
+	}
+	user, err := h.store.UserRepository().GetUserById(userId)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusNotFound, err)
+		return
+	}
+
 	var payload models.CreateIntentRequest
 	if err := utils.DecodeRequestBody(r, &payload); err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
+	intSubscriptionId, err := strconv.Atoi(strings.TrimSpace(payload.SubscriptionID))
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
+		return
+	}
+	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(intSubscriptionId)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusNotFound, err)
+		return
+	}
 
 	stripe.Key = h.appConfig.StripeSecretKey
 
-	// TODO: with subscription_id fetch subscription details and fill the params like Amount, Currency, Customer, PaymentMethod
-	params := &stripe.PaymentIntentParams{
-		Amount:   stripe.Int64(1099),
-		Currency: stripe.String(string(stripe.CurrencyEUR)),
-		// TODO: payment methods
+	var stripeCustomer *stripe.Customer
 
+	if user.StripeCustomerID == "" {
+		cparams := &stripe.CustomerParams{
+			Name:  &user.Name,
+			Email: &user.Email,
+		}
+		stripeCustomer, err = customer.New(cparams)
+		if err != nil {
+			var stripeErr *stripe.Error
+			if errors.As(err, &stripeErr) {
+				utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
+				return
+			}
+		}
+		err = h.store.UserRepository().UpdateUser(
+			user.ID, &models.UpdateUserRequest{
+				StripeCustomerID: stripeCustomer.ID,
+			},
+		)
+		if err != nil {
+			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+			return
+		}
+	} else {
+		stripeCustomer, err = customer.Get(user.StripeCustomerID, nil)
+		if err != nil {
+			if err != nil {
+				var stripeErr *stripe.Error
+				if errors.As(err, &stripeErr) {
+					utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
+					return
+				}
+			}
+		}
+	}
+
+	params := &stripe.PaymentIntentParams{
+		Amount:   stripe.Int64(int64(subscription.Price)),
+		Currency: stripe.String(subscription.Currency),
+		Customer: stripe.String(stripeCustomer.ID),
 	}
 
 	pi, err := paymentintent.New(params)
 	if err != nil {
-		if stripeErr, ok := err.(*stripe.Error); ok {
+		var stripeErr *stripe.Error
+		if errors.As(err, &stripeErr) {
 			utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
-			return
-		} else {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 			return
 		}
 	}
 
 	resp := models.CreateIntentResponse{
-		ClientSecret: pi.ClientSecret,
+		PaymentIntent: pi.ClientSecret,
+		Customer:      stripeCustomer.ID,
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp, nil)

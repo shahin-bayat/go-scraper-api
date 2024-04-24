@@ -23,27 +23,49 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/health", handlers.HealthHandler)
-		r.Get("/auth/{provider}/user-info", handlers.GetUserInfo)
-		r.Get("/auth/{provider}/login", handlers.HandleProviderLogin)
-		r.Get("/auth/{provider}/callback", handlers.HandleProviderCallback)
-		r.Post("/auth/{provider}/logout", handlers.HandleLogout)
+	r.Route(
+		"/api/v1", func(r chi.Router) {
+			r.Get("/health", handlers.HealthHandler)
+			r.Get("/auth/{provider}/user-info", handlers.GetUserInfo)
+			r.Get("/auth/{provider}/login", handlers.HandleProviderLogin)
+			r.Get("/auth/{provider}/callback", handlers.HandleProviderCallback)
+			r.Post("/auth/{provider}/logout", handlers.HandleLogout)
 
-		r.Get("/payment/config", handlers.HandlePaymentConfig)
-		r.Post("/payment/webhook", handlers.HandlePaymentWebhook)
-		r.Post("/payment/intent", handlers.HandlePaymentIntent)
+			r.Group(
+				func(r chi.Router) {
+					r.Use(middlewares.Auth)
+					r.Route(
+						"/category", func(r chi.Router) {
+							r.Get("/", handlers.GetCategories)
+							r.Get("/{categoryId}", handlers.GetCategoryDetail)
+						},
+					)
+					r.Route(
+						"/question", func(r chi.Router) {
+							r.Get("/{questionId}", handlers.GetQuestionDetail)
+							r.Get("/supported-languages", handlers.GetSupportedLanguages)
+						},
+					)
+					r.Get("/image/{filename}", handlers.GetImage)
 
-		r.Group(func(r chi.Router) {
-			r.Use(middlewares.Auth)
-			r.Route("/category", func(r chi.Router) {
-				r.Get("/", handlers.GetCategories)
-				r.Get("/{categoryId}", handlers.GetCategoryDetail)
-			})
-			r.Get("/question/{questionId}", handlers.GetQuestionDetail)
-			r.Get("/image/{filename}", handlers.GetImage)
-		})
-	})
+					r.Route(
+						"/subscription", func(r chi.Router) {
+							r.Get("/", handlers.GetSubscriptions)
+							r.Get("/{subscriptionId}", handlers.GetSubscriptionDetail)
+						},
+					)
+
+					r.Route(
+						"/payment", func(r chi.Router) {
+							r.Get("/config", handlers.HandlePaymentConfig)
+							r.Post("/webhook", handlers.HandlePaymentWebhook)
+							r.Post("/intent", handlers.HandlePaymentIntent)
+						},
+					)
+				},
+			)
+		},
+	)
 
 	return r
 }

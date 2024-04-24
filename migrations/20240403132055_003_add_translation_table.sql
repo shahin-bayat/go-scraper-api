@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS translations (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP
-)
+);
 -- +goose StatementEnd
 
 -- +goose Down
