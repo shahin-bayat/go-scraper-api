@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 	"net/http"
 	"strconv"
@@ -9,11 +10,15 @@ import (
 
 func (h *Handler) GetSubscriptions(w http.ResponseWriter, r *http.Request) {
 	subscriptions, err := h.store.SubscriptionRepository().GetSubscriptions()
+	var response models.GetSubscriptionsResponse
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, subscriptions, nil)
+	response.Subscriptions = subscriptions
+	response.Features = []string{"Ad-Free Experience", "Access to All Questions", "Bookmark Favorite Questions", "Practice Failed Questions", "Practice Challenging Questions", "Train with Image-Based Questions"}
+
+	utils.WriteJSON(w, http.StatusOK, response, nil)
 }
 
 func (h *Handler) GetSubscriptionDetail(w http.ResponseWriter, r *http.Request) {

@@ -13,7 +13,7 @@ var (
 )
 
 type SubscriptionRepository interface {
-	GetSubscriptions() ([]models.SubscriptionResponse, error)
+	GetSubscriptions() ([]models.Subscription, error)
 	GetSubscriptionDetail(subscriptionId int) (models.Subscription, error)
 	GetSubscriptionById(subscriptionId int) (models.Subscription, error)
 	ErrorMissingSubscriptionId() error
@@ -29,26 +29,13 @@ func NewSubscriptionRepository(db *sqlx.DB) SubscriptionRepository {
 	}
 }
 
-func (sr *subscriptionRepository) GetSubscriptions() ([]models.SubscriptionResponse, error) {
+func (sr *subscriptionRepository) GetSubscriptions() ([]models.Subscription, error) {
 	var subscriptions []models.Subscription
-	var subscriptionResponse []models.SubscriptionResponse
 	err := sr.db.Select(&subscriptions, "SELECT * FROM subscriptions")
 	if err != nil {
 		return nil, ErrorGetSubscriptions
 	}
-	for _, subscription := range subscriptions {
-		subscriptionResponse = append(
-			subscriptionResponse, models.SubscriptionResponse{
-				ID:          subscription.ID,
-				Name:        subscription.Name,
-				Description: subscription.Description,
-				Price:       float32(subscription.Price) * 0.01,
-				Currency:    subscription.Currency,
-			},
-		)
-	}
-
-	return subscriptionResponse, nil
+	return subscriptions, nil
 }
 
 func (sr *subscriptionRepository) GetSubscriptionDetail(subscriptionId int) (models.Subscription, error) {

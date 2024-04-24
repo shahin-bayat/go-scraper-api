@@ -16,10 +16,7 @@ type Subscription struct {
 	DeletedAt   *time.Time `json:"-" db:"deleted_at"`
 }
 
-type SubscriptionResponse struct {
-	ID          uint    `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float32 `json:"price"`
-	Currency    string  `json:"currency"`
+type GetSubscriptionsResponse struct {
+	Subscriptions []Subscription `json:"subscriptions"`
+	Features      []string       `json:"features"`
 }
