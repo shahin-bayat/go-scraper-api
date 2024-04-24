@@ -31,7 +31,7 @@ func NewSubscriptionRepository(db *sqlx.DB) SubscriptionRepository {
 
 func (sr *subscriptionRepository) GetSubscriptions() ([]models.Subscription, error) {
 	var subscriptions []models.Subscription
-	err := sr.db.Select(&subscriptions, "SELECT * FROM subscriptions")
+	err := sr.db.Select(&subscriptions, "SELECT * FROM subscriptions ORDER BY id")
 	if err != nil {
 		return nil, ErrorGetSubscriptions
 	}
