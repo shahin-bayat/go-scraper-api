@@ -3,7 +3,6 @@ package repositories
 import (
 	"errors"
 	"fmt"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
 )
@@ -19,18 +18,23 @@ var (
 	ErrorMissingQuestionId      = errors.New("question id is required")
 	ErrorMissingFilename        = errors.New("filename is required")
 	ErrorFileNotFound           = errors.New("file not found")
+	ErrorBookmarkQuestion       = errors.New("error bookmarking question")
+	ErrorGetBookmarks           = errors.New("error getting bookmarks")
 )
 
 type QuestionRepository interface {
 	GetCategories() ([]models.Category, error)
-	GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error)
-	GetFreeCategoryDetail(categoryId int, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
-	GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
+	GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error)
+	GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
+	GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
+	BookmarkQuestion(questionId uint, userId uint) (uint, error)
+	GetBookmarks(userId uint) ([]models.BookmarkResponse, error)
 	ErrorMissingCategoryId() error
 	ErrorUnsupportedLanguage() error
 	ErrorMissingQuestionId() error
 	ErrorMissingFilename() error
 	ErrorFileNotFound() error
+	ErrGetBookmarks() error
 }
 type questionRepository struct {
 	db *sqlx.DB
@@ -51,7 +55,7 @@ func (qr *questionRepository) GetCategories() ([]models.Category, error) {
 	return categories, nil
 }
 
-func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
+func (qr *questionRepository) GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qr.db.Queryx(
 		`
@@ -59,8 +63,8 @@ func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.Catego
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 
-			ORDER BY q.id ASC
-	`, categoryId,
+			ORDER BY q.id
+			`, categoryId,
 	)
 	if err != nil {
 		return nil, ErrorGetCategoryDetail
@@ -78,7 +82,7 @@ func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.Catego
 	return categoryDetailResponse, nil
 }
 
-func (qr *questionRepository) GetFreeCategoryDetail(categoryId int, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error) {
+func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qr.db.Queryx(
 		`
@@ -86,8 +90,8 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId int, freeQuestion
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 AND q.id IN ($2, $3, $4)
-			ORDER BY q.id ASC
-	`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2],
+			ORDER BY q.id
+			`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2],
 	)
 	if err != nil {
 		return nil, ErrorGetCategoryDetail
@@ -105,7 +109,7 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId int, freeQuestion
 	return categoryDetailResponse, nil
 }
 
-func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
+func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
 
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
@@ -113,11 +117,11 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 
 	err := qr.db.Get(
 		&response, `
-			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
+			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name, EXISTS(SELECT 1 FROM bookmarks WHERE question_id = $1 AND user_id = $2) AS is_bookmarked  
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
 			WHERE q.id = $1
-	`, questionId,
+			`, questionId, userId,
 	)
 
 	if err != nil {
@@ -132,7 +136,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 				SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
 				FROM answers
 				WHERE question_id = $1
-		`, questionId,
+				`, questionId,
 	)
 	if err != nil {
 		return models.QuestionDetailResponse{}, ErrorGetQuestionAnswers
@@ -164,7 +168,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 
 		for i, answer := range response.Answers {
 			for _, translation := range answersTranslation {
-				if answer.ID == uint(translation.ReferID) {
+				if answer.ID == translation.ReferID {
 					response.Answers[i].Text = translation.Translation
 				}
 			}
@@ -172,6 +176,49 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 	}
 
 	return response, nil
+}
+
+func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (uint, error) {
+	var bookmark models.Bookmark
+	err := qr.db.Get(
+		&bookmark, `SELECT * from bookmarks WHERE user_id = $1 AND question_id = $2`, userId, questionId,
+	)
+
+	if err != nil && err.Error() == "sql: no rows in result set" {
+		var bookmarkId uint
+		err := qr.db.QueryRow(
+			`
+			INSERT INTO bookmarks (user_id, question_id) VALUES ($1, $2) RETURNING id
+			`, userId, questionId,
+		).Scan(&bookmarkId)
+		if err != nil {
+			return 0, ErrorBookmarkQuestion
+		}
+		return bookmarkId, nil
+	} else {
+		_, err := qr.db.Exec("DELETE FROM bookmarks WHERE user_id = $1 AND question_id = $2", userId, questionId)
+		if err != nil {
+			return 0, ErrorBookmarkQuestion
+		}
+	}
+	return 0, nil
+}
+
+func (qr *questionRepository) GetBookmarks(userId uint) ([]models.BookmarkResponse, error) {
+	var bookmarks []models.BookmarkResponse
+	err := qr.db.Select(
+		&bookmarks, `
+				SELECT q.question_number, q.id AS question_id FROM bookmarks AS b
+				JOIN questions AS q ON b.question_id = q.id
+				WHERE b.user_id = $1
+				ORDER BY q.id
+				`, userId,
+	)
+	fmt.Print("bookmarks", bookmarks, "err", err)
+	if err != nil {
+		return nil, ErrorGetBookmarks
+	}
+	return bookmarks, nil
 }
 
 func (qr *questionRepository) ErrorMissingCategoryId() error {
@@ -191,4 +238,8 @@ func (qr *questionRepository) ErrorMissingFilename() error {
 
 func (qr *questionRepository) ErrorFileNotFound() error {
 	return ErrorFileNotFound
+}
+
+func (qr *questionRepository) ErrGetBookmarks() error {
+	return ErrorGetBookmarks
 }

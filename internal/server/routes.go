@@ -44,6 +44,9 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 						"/question", func(r chi.Router) {
 							r.Get("/{questionId}", handlers.GetQuestionDetail)
 							r.Get("/supported-languages", handlers.GetSupportedLanguages)
+							r.Post("/bookmark", handlers.ToggleBookmark)
+							r.Get("/bookmark", handlers.GetBookmarks)
+							//r.Post("/user-answer", handlers.HandleUserAnswer)
 						},
 					)
 					r.Get("/image/{filename}", handlers.GetImage)
@@ -57,9 +60,9 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 
 					r.Route(
 						"/payment", func(r chi.Router) {
-							r.Get("/config", handlers.HandlePaymentConfig)
+							r.Get("/config", handlers.GetPaymentConfig)
 							r.Post("/webhook", handlers.HandlePaymentWebhook)
-							r.Post("/intent", handlers.HandlePaymentIntent)
+							r.Post("/intent", handlers.CreatePaymentIntent)
 						},
 					)
 				},

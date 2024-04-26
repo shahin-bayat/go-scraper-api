@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func GenerateRandomString(length int) (string, error) {
+func GenerateRandomString(length uint) (string, error) {
 	// Create byte slice of appropriate length
 	randomBytes := make([]byte, length)
 
@@ -22,14 +22,14 @@ func GenerateRandomString(length int) (string, error) {
 	return randomString[:length], nil
 }
 
-func StringInSlice(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == TrimSpaceLower(str) {
-			return true
-		}
-	}
-	return false
-}
+//func StringInSlice(slice []string, str string) bool {
+//	for _, s := range slice {
+//		if s == TrimSpaceLower(str) {
+//			return true
+//		}
+//	}
+//	return false
+//}
 
 func KeyInMap(m map[string]string, key string) bool {
 	_, ok := m[key]

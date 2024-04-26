@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/shahin-bayat/scraper-api/internal/models"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,7 +37,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorMissingCategoryId())
 		return
 	}
-	uintCategoryId, err := strconv.Atoi(categoryId)
+	intCategoryId, err := strconv.Atoi(categoryId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
@@ -44,7 +45,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 
 	_, err = middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
-		category, err := h.store.QuestionRepository().GetFreeCategoryDetail(uintCategoryId, freeQuestionIds)
+		category, err := h.store.QuestionRepository().GetFreeCategoryDetail(uint(intCategoryId), freeQuestionIds)
 		if err != nil {
 			utils.WriteErrorJSON(w, http.StatusNotFound, err)
 			return
@@ -53,7 +54,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := h.store.QuestionRepository().GetCategoryDetail(uintCategoryId)
+	category, err := h.store.QuestionRepository().GetCategoryDetail(uint(intCategoryId))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return
@@ -75,22 +76,22 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.QuestionRepository().ErrorMissingQuestionId())
 		return
 	}
-	uintQuestionId, err := strconv.Atoi(questionId)
+	intQuestionId, err := strconv.Atoi(questionId)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
 
-	_, err = middlewares.GetUserIdFromContext(r.Context())
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
-		if !utils.UintInSlice(freeQuestionIds[:], uint(uintQuestionId)) {
+		if !utils.UintInSlice(freeQuestionIds[:], uint(intQuestionId)) {
 			utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
 			return
 		}
 	}
-
+	//TODO: check subscription status for bookmarks
 	question, err := h.store.QuestionRepository().GetQuestionDetail(
-		uintQuestionId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL,
+		uint(intQuestionId), userId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL,
 	)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
@@ -98,6 +99,52 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteJSON(w, http.StatusOK, question, nil)
+}
+
+func (h *Handler) ToggleBookmark(w http.ResponseWriter, r *http.Request) {
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+		return
+	}
+	// TODO: check subscription status for bookmarks
+
+	var bookmarkRequest models.BookmarkRequest
+	if err := utils.DecodeRequestBody(r, &bookmarkRequest); err != nil {
+		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
+		return
+	}
+
+	bookmarkId, err := h.store.QuestionRepository().BookmarkQuestion(
+		bookmarkRequest.QuestionId, userId,
+	)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+		return
+	}
+	if bookmarkId == 0 {
+		utils.WriteJSON(w, http.StatusNoContent, nil, nil)
+		return
+	} else {
+		utils.WriteJSON(w, http.StatusCreated, nil, nil)
+		return
+	}
+}
+
+func (h *Handler) GetBookmarks(w http.ResponseWriter, r *http.Request) {
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+	}
+
+	// TODO: check subscription status for bookmarks
+
+	bookmarks, err := h.store.QuestionRepository().GetBookmarks(userId)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+		return
+	}
+	utils.WriteJSON(w, http.StatusOK, bookmarks, nil)
 }
 
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {

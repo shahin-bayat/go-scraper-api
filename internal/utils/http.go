@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -22,6 +23,9 @@ func WriteJSON(w http.ResponseWriter, status int, v interface{}, headers map[str
 		w.Header().Set(key, value)
 	}
 	w.WriteHeader(status)
+	if status == http.StatusNoContent {
+		return
+	}
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		log.Fatal(err)
 	}
@@ -48,9 +52,17 @@ func ReadBody(r *http.Request) ([]byte, error) {
 func DecodeRequestBody(r *http.Request, v interface{}) error {
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	return decoder.Decode(v)
+	err := decoder.Decode(v)
+	if err != nil {
+		return errors.New("failed to decode request body")
+	}
+	return nil
 }
 
 func DecodeResponseBody(body io.ReadCloser, v interface{}) error {
-	return json.NewDecoder(body).Decode(v)
+	err := json.NewDecoder(body).Decode(v)
+	if err != nil {
+		return errors.New("failed to decode response body")
+	}
+	return nil
 }
