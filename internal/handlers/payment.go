@@ -20,7 +20,7 @@ type paymentConfig struct {
 	PublishableKey string `json:"publishableKey"`
 }
 
-func (h *Handler) HandlePaymentConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetPaymentConfig(w http.ResponseWriter, r *http.Request) {
 	config := paymentConfig{
 		PublishableKey: h.appConfig.StripePublishableKey,
 	}
@@ -49,7 +49,7 @@ func (h *Handler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSON(w, http.StatusOK, nil, nil)
 }
 
-func (h *Handler) HandlePaymentIntent(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	userId, err := middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
@@ -71,7 +71,7 @@ func (h *Handler) HandlePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
-	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(intSubscriptionId)
+	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(uint(intSubscriptionId))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return

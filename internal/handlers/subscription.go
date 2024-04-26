@@ -32,7 +32,7 @@ func (h *Handler) GetSubscriptionDetail(w http.ResponseWriter, r *http.Request) 
 		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
 		return
 	}
-	subscription, err := h.store.SubscriptionRepository().GetSubscriptionDetail(intSubscriptionId)
+	subscription, err := h.store.SubscriptionRepository().GetSubscriptionDetail(uint(intSubscriptionId))
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)
 		return

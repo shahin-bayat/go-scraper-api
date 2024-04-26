@@ -3,7 +3,6 @@ package repositories
 import (
 	"errors"
 	"fmt"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
 )
@@ -19,13 +18,15 @@ var (
 	ErrorMissingQuestionId      = errors.New("question id is required")
 	ErrorMissingFilename        = errors.New("filename is required")
 	ErrorFileNotFound           = errors.New("file not found")
+	ErrorBookmarkQuestion       = errors.New("error bookmarking question")
 )
 
 type QuestionRepository interface {
 	GetCategories() ([]models.Category, error)
-	GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error)
-	GetFreeCategoryDetail(categoryId int, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
-	GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
+	GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error)
+	GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
+	GetQuestionDetail(questionId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
+	BookmarkQuestion(questionId uint, userId uint) (uint, error)
 	ErrorMissingCategoryId() error
 	ErrorUnsupportedLanguage() error
 	ErrorMissingQuestionId() error
@@ -51,7 +52,7 @@ func (qr *questionRepository) GetCategories() ([]models.Category, error) {
 	return categories, nil
 }
 
-func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.CategoryDetailResponse, error) {
+func (qr *questionRepository) GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qr.db.Queryx(
 		`
@@ -78,7 +79,7 @@ func (qr *questionRepository) GetCategoryDetail(categoryId int) ([]models.Catego
 	return categoryDetailResponse, nil
 }
 
-func (qr *questionRepository) GetFreeCategoryDetail(categoryId int, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error) {
+func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qr.db.Queryx(
 		`
@@ -105,7 +106,7 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId int, freeQuestion
 	return categoryDetailResponse, nil
 }
 
-func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
+func (qr *questionRepository) GetQuestionDetail(questionId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
 
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
@@ -164,7 +165,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 
 		for i, answer := range response.Answers {
 			for _, translation := range answersTranslation {
-				if answer.ID == uint(translation.ReferID) {
+				if answer.ID == translation.ReferID {
 					response.Answers[i].Text = translation.Translation
 				}
 			}
@@ -172,6 +173,32 @@ func (qr *questionRepository) GetQuestionDetail(questionId int, lang string, api
 	}
 
 	return response, nil
+}
+
+func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (uint, error) {
+	var bookmark models.Bookmark
+	err := qr.db.Get(
+		&bookmark, `SELECT * from bookmarks WHERE user_id = $1 AND question_id = $2`, userId, questionId,
+	)
+
+	if err != nil && err.Error() == "sql: no rows in result set" {
+		var bookmarkId uint
+		err := qr.db.QueryRow(
+			`
+			INSERT INTO bookmarks (user_id, question_id) VALUES ($1, $2) RETURNING id
+	`, userId, questionId,
+		).Scan(&bookmarkId)
+		if err != nil {
+			return 0, ErrorBookmarkQuestion
+		}
+		return bookmarkId, nil
+	} else {
+		_, err := qr.db.Exec("DELETE FROM bookmarks WHERE user_id = $1 AND question_id = $2", userId, questionId)
+		if err != nil {
+			return 0, ErrorBookmarkQuestion
+		}
+	}
+	return 0, nil
 }
 
 func (qr *questionRepository) ErrorMissingCategoryId() error {

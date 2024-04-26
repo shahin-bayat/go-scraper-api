@@ -34,7 +34,7 @@ type Answer struct {
 
 type CategoryDetailResponse struct {
 	QuestionNumber string `json:"question_number" db:"question_number"`
-	QuestionId     int    `json:"question_id" db:"id"`
+	QuestionId     uint   `json:"question_id" db:"id"`
 }
 
 type QuestionDetailResponse struct {
@@ -44,4 +44,15 @@ type QuestionDetailResponse struct {
 	Filename       string   `json:"-" db:"file_name"`
 	FileURL        string   `json:"file_url"`
 	Answers        []Answer `json:"answers"`
+}
+
+type Bookmark struct {
+	ID         uint      `json:"id" db:"id"`
+	UserID     uint      `json:"-" db:"user_id"`
+	QuestionID uint      `json:"-" db:"question_id"`
+	CreatedAt  time.Time `json:"-" db:"created_at"`
+}
+
+type BookmarkRequest struct {
+	QuestionId uint `json:"question_id"`
 }

@@ -21,8 +21,8 @@ const (
 )
 
 type Translation struct {
-	ID          int        `db:"id" json:"-"`
-	ReferID     int        `db:"refer_id" json:"-"`
+	ID          uint       `db:"id" json:"-"`
+	ReferID     uint       `db:"refer_id" json:"-"`
 	Type        string     `db:"type" json:"-"`
 	Lang        string     `db:"lang" json:"-"`
 	Translation string     `db:"translation" json:"translation"`

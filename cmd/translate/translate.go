@@ -19,12 +19,12 @@ var (
 )
 
 type question struct {
-	ID       int    `db:"id"`
+	ID       uint   `db:"id"`
 	Question string `db:"extracted_text"`
 }
 
 type answer struct {
-	ID   int    `db:"id"`
+	ID   uint   `db:"id"`
 	Text string `db:"text"`
 }
 
