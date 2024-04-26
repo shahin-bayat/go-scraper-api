@@ -82,7 +82,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = middlewares.GetUserIdFromContext(r.Context())
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
 		if !utils.UintInSlice(freeQuestionIds[:], uint(intQuestionId)) {
 			utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
@@ -91,7 +91,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	question, err := h.store.QuestionRepository().GetQuestionDetail(
-		uint(intQuestionId), utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL,
+		uint(intQuestionId), userId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL,
 	)
 	if err != nil {
 		utils.WriteErrorJSON(w, http.StatusNotFound, err)

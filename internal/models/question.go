@@ -44,6 +44,7 @@ type QuestionDetailResponse struct {
 	Filename       string   `json:"-" db:"file_name"`
 	FileURL        string   `json:"file_url"`
 	Answers        []Answer `json:"answers"`
+	IsBookmarked   bool     `json:"is_bookmarked" db:"is_bookmarked"`
 }
 
 type Bookmark struct {

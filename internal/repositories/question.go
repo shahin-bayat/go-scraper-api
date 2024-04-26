@@ -25,7 +25,7 @@ type QuestionRepository interface {
 	GetCategories() ([]models.Category, error)
 	GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error)
 	GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
-	GetQuestionDetail(questionId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
+	GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
 	BookmarkQuestion(questionId uint, userId uint) (uint, error)
 	ErrorMissingCategoryId() error
 	ErrorUnsupportedLanguage() error
@@ -106,7 +106,7 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestio
 	return categoryDetailResponse, nil
 }
 
-func (qr *questionRepository) GetQuestionDetail(questionId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
+func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
 
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
@@ -114,11 +114,11 @@ func (qr *questionRepository) GetQuestionDetail(questionId uint, lang string, ap
 
 	err := qr.db.Get(
 		&response, `
-			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name 
+			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name, EXISTS(SELECT 1 FROM bookmarks WHERE question_id = $1 AND user_id = $2) AS is_bookmarked  
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
 			WHERE q.id = $1
-	`, questionId,
+	`, questionId, userId,
 	)
 
 	if err != nil {
