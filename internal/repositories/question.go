@@ -19,6 +19,7 @@ var (
 	ErrorMissingFilename        = errors.New("filename is required")
 	ErrorFileNotFound           = errors.New("file not found")
 	ErrorBookmarkQuestion       = errors.New("error bookmarking question")
+	ErrorGetBookmarks           = errors.New("error getting bookmarks")
 )
 
 type QuestionRepository interface {
@@ -27,11 +28,13 @@ type QuestionRepository interface {
 	GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
 	GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
 	BookmarkQuestion(questionId uint, userId uint) (uint, error)
+	GetBookmarks(userId uint) ([]models.BookmarkResponse, error)
 	ErrorMissingCategoryId() error
 	ErrorUnsupportedLanguage() error
 	ErrorMissingQuestionId() error
 	ErrorMissingFilename() error
 	ErrorFileNotFound() error
+	ErrGetBookmarks() error
 }
 type questionRepository struct {
 	db *sqlx.DB
@@ -60,8 +63,8 @@ func (qr *questionRepository) GetCategoryDetail(categoryId uint) ([]models.Categ
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 
-			ORDER BY q.id ASC
-	`, categoryId,
+			ORDER BY q.id
+			`, categoryId,
 	)
 	if err != nil {
 		return nil, ErrorGetCategoryDetail
@@ -87,8 +90,8 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestio
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 AND q.id IN ($2, $3, $4)
-			ORDER BY q.id ASC
-	`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2],
+			ORDER BY q.id
+			`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2],
 	)
 	if err != nil {
 		return nil, ErrorGetCategoryDetail
@@ -118,7 +121,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang st
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
 			WHERE q.id = $1
-	`, questionId, userId,
+			`, questionId, userId,
 	)
 
 	if err != nil {
@@ -133,7 +136,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang st
 				SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
 				FROM answers
 				WHERE question_id = $1
-		`, questionId,
+				`, questionId,
 	)
 	if err != nil {
 		return models.QuestionDetailResponse{}, ErrorGetQuestionAnswers
@@ -186,7 +189,7 @@ func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (ui
 		err := qr.db.QueryRow(
 			`
 			INSERT INTO bookmarks (user_id, question_id) VALUES ($1, $2) RETURNING id
-	`, userId, questionId,
+			`, userId, questionId,
 		).Scan(&bookmarkId)
 		if err != nil {
 			return 0, ErrorBookmarkQuestion
@@ -199,6 +202,23 @@ func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (ui
 		}
 	}
 	return 0, nil
+}
+
+func (qr *questionRepository) GetBookmarks(userId uint) ([]models.BookmarkResponse, error) {
+	var bookmarks []models.BookmarkResponse
+	err := qr.db.Select(
+		&bookmarks, `
+				SELECT q.question_number, q.id AS question_id FROM bookmarks AS b
+				JOIN questions AS q ON b.question_id = q.id
+				WHERE b.user_id = $1
+				ORDER BY q.id
+				`, userId,
+	)
+	fmt.Print("bookmarks", bookmarks, "err", err)
+	if err != nil {
+		return nil, ErrorGetBookmarks
+	}
+	return bookmarks, nil
 }
 
 func (qr *questionRepository) ErrorMissingCategoryId() error {
@@ -218,4 +238,8 @@ func (qr *questionRepository) ErrorMissingFilename() error {
 
 func (qr *questionRepository) ErrorFileNotFound() error {
 	return ErrorFileNotFound
+}
+
+func (qr *questionRepository) ErrGetBookmarks() error {
+	return ErrorGetBookmarks
 }

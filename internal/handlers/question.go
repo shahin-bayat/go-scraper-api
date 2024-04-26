@@ -89,7 +89,7 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+	//TODO: check subscription status for bookmarks
 	question, err := h.store.QuestionRepository().GetQuestionDetail(
 		uint(intQuestionId), userId, utils.TrimSpaceLower(lang), h.appConfig.APIBaseURL,
 	)
@@ -107,6 +107,7 @@ func (h *Handler) ToggleBookmark(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
 		return
 	}
+	// TODO: check subscription status for bookmarks
 
 	var bookmarkRequest models.BookmarkRequest
 	if err := utils.DecodeRequestBody(r, &bookmarkRequest); err != nil {
@@ -128,6 +129,22 @@ func (h *Handler) ToggleBookmark(w http.ResponseWriter, r *http.Request) {
 		utils.WriteJSON(w, http.StatusCreated, nil, nil)
 		return
 	}
+}
+
+func (h *Handler) GetBookmarks(w http.ResponseWriter, r *http.Request) {
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+	}
+
+	// TODO: check subscription status for bookmarks
+
+	bookmarks, err := h.store.QuestionRepository().GetBookmarks(userId)
+	if err != nil {
+		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+		return
+	}
+	utils.WriteJSON(w, http.StatusOK, bookmarks, nil)
 }
 
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {

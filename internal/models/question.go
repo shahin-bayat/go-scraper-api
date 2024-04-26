@@ -48,10 +48,15 @@ type QuestionDetailResponse struct {
 }
 
 type Bookmark struct {
-	ID         uint      `json:"id" db:"id"`
-	UserID     uint      `json:"-" db:"user_id"`
-	QuestionID uint      `json:"-" db:"question_id"`
-	CreatedAt  time.Time `json:"-" db:"created_at"`
+	ID         uint      `db:"id"`
+	UserID     uint      `db:"user_id"`
+	QuestionID uint      `db:"question_id"`
+	CreatedAt  time.Time `db:"created_at"`
+}
+
+type BookmarkResponse struct {
+	QuestionNumber string `json:"question_number" db:"question_number"`
+	QuestionID     uint   `json:"question_id" db:"question_id"`
 }
 
 type BookmarkRequest struct {

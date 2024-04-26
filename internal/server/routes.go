@@ -45,6 +45,7 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 							r.Get("/{questionId}", handlers.GetQuestionDetail)
 							r.Get("/supported-languages", handlers.GetSupportedLanguages)
 							r.Post("/bookmark", handlers.ToggleBookmark)
+							r.Get("/bookmark", handlers.GetBookmarks)
 							//r.Post("/user-answer", handlers.HandleUserAnswer)
 						},
 					)
