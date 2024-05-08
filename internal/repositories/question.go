@@ -214,7 +214,6 @@ func (qr *questionRepository) GetBookmarks(userId uint) ([]models.BookmarkRespon
 				ORDER BY q.id
 				`, userId,
 	)
-	fmt.Print("bookmarks", bookmarks, "err", err)
 	if err != nil {
 		return nil, ErrorGetBookmarks
 	}

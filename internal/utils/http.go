@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,6 +11,29 @@ import (
 
 type ErrorResponse struct {
 	Error string `json:"error"`
+}
+
+type APIFunc func(w http.ResponseWriter, r *http.Request) error
+
+type APIError struct {
+	StatusCode int `json:"status_code"`
+	Message    any `json:"message"`
+}
+
+func (e APIError) Error() string {
+	return fmt.Sprintf("api error: %d", e.StatusCode)
+}
+
+func NewAPIError(statusCode int, err error) APIError {
+	return APIError{StatusCode: statusCode, Message: err.Error()}
+}
+
+func InvalidRequestData(errors map[string]string) APIError {
+	return APIError{StatusCode: http.StatusBadRequest, Message: errors}
+}
+
+func InvalidJSON() APIError {
+	return NewAPIError(http.StatusBadRequest, errors.New("invalid JSON request data"))
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v interface{}, headers map[string]string) {
@@ -62,7 +86,22 @@ func DecodeRequestBody(r *http.Request, v interface{}) error {
 func DecodeResponseBody(body io.ReadCloser, v interface{}) error {
 	err := json.NewDecoder(body).Decode(v)
 	if err != nil {
-		return errors.New("failed to decode response body")
+		return err
 	}
 	return nil
+}
+
+func Make(h APIFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := h(w, r); err != nil {
+			var apiErr APIError
+			if errors.As(err, &apiErr) {
+				WriteJSON(w, apiErr.StatusCode, apiErr.Message, nil)
+			} else {
+				errResp := NewAPIError(http.StatusInternalServerError, errors.New("internal server error"))
+				WriteJSON(w, errResp.StatusCode, errResp.Message, nil)
+			}
+			// TODO: slog error
+		}
+	}
 }

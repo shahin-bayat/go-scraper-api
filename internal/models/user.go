@@ -31,3 +31,15 @@ type User struct {
 type UpdateUserRequest struct {
 	StripeCustomerID string `json:"stripe_customer_id" db:"stripe_customer_id"`
 }
+
+func NewUser(userInfo *GoogleUserInfo) User {
+	return User{
+		Email:         userInfo.Email,
+		GivenName:     userInfo.GivenName,
+		FamilyName:    userInfo.FamilyName,
+		Name:          userInfo.Name,
+		Locale:        userInfo.Locale,
+		AvatarURL:     userInfo.AvatarURL,
+		VerifiedEmail: userInfo.VerifiedEmail,
+	}
+}
