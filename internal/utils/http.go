@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -101,7 +102,10 @@ func Make(h APIFunc) http.HandlerFunc {
 				errResp := NewAPIError(http.StatusInternalServerError, errors.New("internal server error"))
 				WriteJSON(w, errResp.StatusCode, errResp.Message, nil)
 			}
-			// TODO: slog error
+			slog.Error(
+				"HTTP API error", "error", err.Error(), "path", r.URL.Path,
+			)
+
 		}
 	}
 }
