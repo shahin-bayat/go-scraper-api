@@ -20,7 +20,6 @@ var (
 	ErrorRevokeToken                = errors.New("failed to revoke token")
 	ErrorExchangeToken              = errors.New("failed to exchange token")
 	ErrorMissingToken               = errors.New("token is missing")
-	ErrorGenerateAuthState          = errors.New("failed to generate auth state")
 	ErrorAuthStateMissmatch         = errors.New("auth state missmatch")
 	ErrorUnauthorized               = errors.New("user is not authorized")
 )
@@ -35,7 +34,6 @@ type AuthService interface {
 	ErrorInvalidToken() error
 	ErrorDecodeUserInfo() error
 	ErrorMissingAuthorizationHeader() error
-	ErrorGenerateAuthState() error
 	ErrorAuthStateMissmatch() error
 	ErrorUnauthorized() error
 }
@@ -137,10 +135,6 @@ func (as *authService) ErrorDecodeUserInfo() error {
 
 func (as *authService) ErrorMissingAuthorizationHeader() error {
 	return ErrorMissingAuthorizationHeader
-}
-
-func (as *authService) ErrorGenerateAuthState() error {
-	return ErrorGenerateAuthState
 }
 
 func (as *authService) ErrorAuthStateMissmatch() error {
