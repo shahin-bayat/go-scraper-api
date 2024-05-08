@@ -140,10 +140,7 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) error {
 				if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 					return err
 				} else {
-					return utils.APIError{
-						StatusCode: http.StatusUnauthorized,
-						Message:    h.services.AuthService.ErrorInvalidToken(),
-					}
+					return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 				}
 			}
 			// get user from database
@@ -206,10 +203,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) error {
 			if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 				return err
 			}
-			return utils.APIError{
-				StatusCode: http.StatusUnauthorized,
-				Message:    h.services.AuthService.ErrorInvalidToken(),
-			}
+			return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 		}
 		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
@@ -224,10 +218,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) error {
 			if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
 				return err
 			}
-			return utils.APIError{
-				StatusCode: http.StatusUnauthorized,
-				Message:    h.services.AuthService.ErrorInvalidToken(),
-			}
+			return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 		}
 		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
