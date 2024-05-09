@@ -4,42 +4,37 @@ import (
 	"errors"
 	"fmt"
 	"github.com/shahin-bayat/scraper-api/internal/middlewares"
-	"github.com/stripe/stripe-go/customer"
-	"net/http"
-	"strconv"
-	"strings"
-
 	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 	"github.com/stripe/stripe-go"
+	"github.com/stripe/stripe-go/customer"
 	"github.com/stripe/stripe-go/paymentintent"
 	"github.com/stripe/stripe-go/webhook"
+	"net/http"
 )
 
 type paymentConfig struct {
 	PublishableKey string `json:"publishableKey"`
 }
 
-func (h *Handler) GetPaymentConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetPaymentConfig(w http.ResponseWriter, r *http.Request) error {
 	config := paymentConfig{
 		PublishableKey: h.appConfig.StripePublishableKey,
 	}
 
 	utils.WriteJSON(w, http.StatusOK, config, nil)
-
+	return nil
 }
 
-func (h *Handler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) error {
 	body, err := utils.ReadBody(r)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+		return err
 	}
 
 	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), h.appConfig.StripeWebhookSecret)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+		return err
 	}
 
 	if event.Type == "checkout.session.completed" {
@@ -47,34 +42,31 @@ func (h *Handler) HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteJSON(w, http.StatusOK, nil, nil)
+	return nil
 }
 
-func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) error {
 	userId, err := middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
-		return
+		return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
 	}
 	user, err := h.store.UserRepository().GetUserById(userId)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusNotFound, err)
-		return
+		return err
 	}
 
-	var payload models.CreateIntentRequest
-	if err := utils.DecodeRequestBody(r, &payload); err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+	var req models.CreateIntentRequest
+	if err := utils.DecodeRequestBody(r, &req); err != nil {
+		return utils.InvalidJSON()
 	}
-	intSubscriptionId, err := strconv.Atoi(strings.TrimSpace(payload.SubscriptionID))
-	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+
+	if validationErrors := req.Validate(); len(validationErrors) > 0 {
+		return utils.InvalidRequestData(validationErrors)
 	}
-	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(uint(intSubscriptionId))
+
+	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(uint(req.SubscriptionID))
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusNotFound, err)
-		return
+		return err
 	}
 
 	stripe.Key = h.appConfig.StripeSecretKey
@@ -90,28 +82,22 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			var stripeErr *stripe.Error
 			if errors.As(err, &stripeErr) {
-				utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
-				return
+				return utils.NewAPIError(stripeErr.HTTPStatusCode, err)
 			}
 		}
-		err = h.store.UserRepository().UpdateUser(
+		if err = h.store.UserRepository().UpdateUser(
 			user.ID, &models.UpdateUserRequest{
 				StripeCustomerID: stripeCustomer.ID,
 			},
-		)
-		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+		); err != nil {
+			return err
 		}
 	} else {
 		stripeCustomer, err = customer.Get(user.StripeCustomerID, nil)
 		if err != nil {
-			if err != nil {
-				var stripeErr *stripe.Error
-				if errors.As(err, &stripeErr) {
-					utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
-					return
-				}
+			var stripeErr *stripe.Error
+			if errors.As(err, &stripeErr) {
+				return utils.NewAPIError(stripeErr.HTTPStatusCode, err)
 			}
 		}
 	}
@@ -126,8 +112,7 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var stripeErr *stripe.Error
 		if errors.As(err, &stripeErr) {
-			utils.WriteErrorJSON(w, stripeErr.HTTPStatusCode, stripeErr)
-			return
+			return utils.NewAPIError(stripeErr.HTTPStatusCode, err)
 		}
 	}
 
@@ -137,4 +122,5 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp, nil)
+	return nil
 }

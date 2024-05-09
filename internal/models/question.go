@@ -62,3 +62,11 @@ type BookmarkResponse struct {
 type BookmarkRequest struct {
 	QuestionId uint `json:"question_id"`
 }
+
+func (r *BookmarkRequest) Validate() map[string]string {
+	errors := make(map[string]string)
+	if r.QuestionId == 0 {
+		errors["question_id"] = "question_id is required"
+	}
+	return errors
+}

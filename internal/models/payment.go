@@ -1,7 +1,15 @@
 package models
 
 type CreateIntentRequest struct {
-	SubscriptionID string `json:"subscription_id"`
+	SubscriptionID int `json:"subscription_id"`
+}
+
+func (r *CreateIntentRequest) Validate() map[string]string {
+	errors := make(map[string]string)
+	if r.SubscriptionID == 0 {
+		errors["subscription_id"] = "subscription_id is required"
+	}
+	return errors
 }
 
 type CreateIntentResponse struct {

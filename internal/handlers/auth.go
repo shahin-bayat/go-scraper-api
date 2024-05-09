@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/models"
@@ -16,24 +17,24 @@ type contextKey string
 
 const providerKey contextKey = "provider"
 
-func (h *Handler) HandleProviderLogin(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleProviderLogin(w http.ResponseWriter, r *http.Request) error {
 	provider := chi.URLParam(r, "provider")
 	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
 
 	verifier := oauth2.GenerateVerifier()
 	state, err := utils.GenerateRandomString(32)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, h.services.AuthService.ErrorGenerateAuthState())
-		return
+		return err
 	}
 	utils.SetSession(w, r, "verifier", verifier)
 	utils.SetSession(w, r, "state", state)
 	url := h.services.AuthService.GetAuthCodeUrl(state, verifier)
 
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	return nil
 }
 
-func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request) error {
 	provider := chi.URLParam(r, "provider")
 	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
 
@@ -43,76 +44,59 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 	sessionState := utils.GetSession(r, "state")
 
 	if state != sessionState {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, h.services.AuthService.ErrorAuthStateMissmatch())
-		return
+		return h.services.AuthService.ErrorAuthStateMissmatch()
 	}
 
 	token, err := h.services.AuthService.ExchangeToken(r.Context(), code, verifier)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+		return err
 	}
+
+	token.Expiry = token.Expiry.Add(30 * 24 * time.Hour)
 
 	appRedirectURL := generateAppRedirectURL(h.appConfig.AppUniversalURL, token.AccessToken, token.RefreshToken)
 
 	userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+		return err
 	}
 
 	// check if the user exists in database
 	existingUser, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
 	if err != nil {
 		// user doesn't exist
-		newUser := models.User{
-			Email:         userInfo.Email,
-			GivenName:     userInfo.GivenName,
-			FamilyName:    userInfo.FamilyName,
-			Name:          userInfo.Name,
-			Locale:        userInfo.Locale,
-			AvatarURL:     userInfo.AvatarURL,
-			VerifiedEmail: userInfo.VerifiedEmail,
-		}
-		// create the user in the database
+		newUser := models.NewUser(userInfo)
 		userId, err := h.store.UserRepository().CreateUser(&newUser)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
-		// create the session in Redis
 		err = h.store.UserRepository().CreateUserSession(userId, token)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 		http.Redirect(w, r, appRedirectURL, http.StatusTemporaryRedirect)
-		return
+		return nil
 	}
-
 	// user exists
-	// check if the session exists
 	_, err = h.store.UserRepository().GetUserSession(existingUser.ID)
 	if err != nil {
-		// session doesn't exist, create it
+		// session doesn't exist
 		err = h.store.UserRepository().CreateUserSession(existingUser.ID, token)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	} else {
-		// session exists, update it
+		// session exists
 		err = h.store.UserRepository().UpdateUserSession(existingUser.ID, token)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	}
-
 	http.Redirect(w, r, appRedirectURL, http.StatusTemporaryRedirect)
+	return nil
 }
 
-func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) error {
 	var token *oauth2.Token
 	provider := chi.URLParam(r, "provider")
 	r = r.WithContext(context.WithValue(r.Context(), providerKey, provider))
@@ -121,8 +105,9 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 	refreshToken := r.Header.Get("refresh_token")
 
 	if accessToken == "" && refreshToken == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, h.services.AuthService.ErrorMissingAuthorizationHeader())
-		return
+		return utils.NewAPIError(
+			http.StatusUnprocessableEntity, h.services.AuthService.ErrorMissingAuthorizationHeader(),
+		)
 	}
 
 	token, err := h.services.AuthService.Token(
@@ -131,20 +116,17 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
 	if err != nil {
 		if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		} else {
 			// access token is invalid
 			if refreshToken == "" {
-				utils.WriteErrorJSON(w, http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
-				return
+				return utils.NewAPIError(http.StatusUnprocessableEntity, h.services.AuthService.ErrorInvalidToken())
 			}
 			// refresh the token
 			token, err := h.services.AuthService.Token(
@@ -153,24 +135,21 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 				},
 			)
 			if err != nil {
-				utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
-				return
+				return err
 			}
 			userInfo, err := h.services.AuthService.ValidateToken(r.Context(), token)
 			// refresh token is invalid
 			if err != nil {
 				if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
-					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+					return err
 				} else {
-					utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
-					return
+					return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 				}
 			}
 			// get user from database
 			user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
 			if err != nil {
-				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-				return
+				return err
 			}
 			// get user session
 			_, err = h.store.UserRepository().GetUserSession(user.ID)
@@ -178,14 +157,13 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 				// user session doesn't exist, create it
 				err = h.store.UserRepository().CreateUserSession(user.ID, token)
 				if err != nil {
-					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
+					return err
 				}
 			} else {
 				// user session exists, update it
 				err = h.store.UserRepository().UpdateUserSession(user.ID, token)
 				if err != nil {
-					utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-					return
+					return err
 				}
 			}
 			headers := map[string]string{
@@ -193,15 +171,14 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 				"refresh_token": token.RefreshToken,
 			}
 			utils.WriteJSON(w, http.StatusOK, user, headers)
-			return
+			return nil
 		}
 	}
 
 	// get user from db
 	user, err := h.store.UserRepository().GetUserByEmail(userInfo.Email)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	headers := map[string]string{
@@ -209,65 +186,59 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 		"refresh_token": refreshToken,
 	}
 	utils.WriteJSON(w, http.StatusOK, user, headers)
+	return nil
 }
 
-func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) error {
 	var user *models.User
 	accessToken := r.Header.Get("access_token")
 	refreshToken := r.Header.Get("refresh_token")
 
 	if accessToken == "" && refreshToken == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, h.services.AuthService.ErrorMissingAuthorizationHeader())
-		return
+		return utils.NewAPIError(
+			http.StatusUnprocessableEntity, h.services.AuthService.ErrorMissingAuthorizationHeader(),
+		)
 	}
 
 	if refreshToken != "" {
 		userInfo, err := h.services.AuthService.ValidateToken(r.Context(), &oauth2.Token{RefreshToken: refreshToken})
 		if err != nil {
 			if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
-				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-				return
+				return err
 			}
-			utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
-			return
+			return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 		}
 		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 		if err := h.services.AuthService.RevokeToken(refreshToken); err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	} else {
 		userInfo, err := h.services.AuthService.ValidateToken(r.Context(), &oauth2.Token{AccessToken: accessToken})
 		if err != nil {
 			if errors.Is(err, h.services.AuthService.ErrorDecodeUserInfo()) {
-				utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-				return
+				return err
 			}
-			utils.WriteErrorJSON(w, http.StatusUnauthorized, err)
-			return
+			return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorInvalidToken())
 		}
 		user, err = h.store.UserRepository().GetUserByEmail(userInfo.Email)
 		if err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 		if err := h.services.AuthService.RevokeToken(accessToken); err != nil {
-			utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	}
 
 	if err := h.store.UserRepository().DeleteUserSession(user.ID); err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 	utils.ClearSession(w, r, "verifier")
 	utils.ClearSession(w, r, "state")
 	utils.WriteJSON(w, http.StatusNoContent, nil, nil)
+	return nil
 }
 
 func generateAppRedirectURL(appURL string, accessToken, refreshToken string) string {
