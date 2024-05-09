@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/models"
@@ -50,6 +51,8 @@ func (h *Handler) HandleProviderCallback(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		return err
 	}
+
+	token.Expiry = token.Expiry.Add(30 * 24 * time.Hour)
 
 	appRedirectURL := generateAppRedirectURL(h.appConfig.AppUniversalURL, token.AccessToken, token.RefreshToken)
 
