@@ -56,15 +56,6 @@ func WriteJSON(w http.ResponseWriter, status int, v interface{}, headers map[str
 	}
 }
 
-func WriteErrorJSON(w http.ResponseWriter, status int, err error) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	errorResponse := ErrorResponse{Error: err.Error()}
-	if err := json.NewEncoder(w).Encode(errorResponse); err != nil {
-		log.Fatal(err)
-	}
-}
-
 func ReadBody(r *http.Request) ([]byte, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -97,10 +88,10 @@ func Make(h APIFunc) http.HandlerFunc {
 		if err := h(w, r); err != nil {
 			var apiErr APIError
 			if errors.As(err, &apiErr) {
-				WriteJSON(w, apiErr.StatusCode, apiErr.Message, nil)
+				WriteJSON(w, apiErr.StatusCode, apiErr, nil)
 			} else {
 				errResp := NewAPIError(http.StatusInternalServerError, errors.New("internal server error"))
-				WriteJSON(w, errResp.StatusCode, errResp.Message, nil)
+				WriteJSON(w, errResp.StatusCode, errResp, nil)
 			}
 			slog.Error(
 				"HTTP API error", "error", err.Error(), "path", r.URL.Path,

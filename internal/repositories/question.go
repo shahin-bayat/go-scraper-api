@@ -1,25 +1,9 @@
 package repositories
 
 import (
-	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
-)
-
-var (
-	ErrorGetCategories          = errors.New("error getting categories")
-	ErrorGetCategoryDetail      = errors.New("error getting category detail")
-	ErrorGetQuestionDetail      = errors.New("error getting question detail")
-	ErrorGetQuestionAnswers     = errors.New("error getting question answers")
-	ErrorGetAnswersTranslations = errors.New("error getting answers translations")
-	ErrorMissingCategoryId      = errors.New("category id is required")
-	ErrorUnsupportedLanguage    = errors.New("language not supported")
-	ErrorMissingQuestionId      = errors.New("question id is required")
-	ErrorMissingFilename        = errors.New("filename is required")
-	ErrorFileNotFound           = errors.New("file not found")
-	ErrorBookmarkQuestion       = errors.New("error bookmarking question")
-	ErrorGetBookmarks           = errors.New("error getting bookmarks")
 )
 
 type QuestionRepository interface {
@@ -29,12 +13,6 @@ type QuestionRepository interface {
 	GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
 	BookmarkQuestion(questionId uint, userId uint) (uint, error)
 	GetBookmarks(userId uint) ([]models.BookmarkResponse, error)
-	ErrorMissingCategoryId() error
-	ErrorUnsupportedLanguage() error
-	ErrorMissingQuestionId() error
-	ErrorMissingFilename() error
-	ErrorFileNotFound() error
-	ErrGetBookmarks() error
 }
 type questionRepository struct {
 	db *sqlx.DB
@@ -48,9 +26,8 @@ func NewQuestionRepository(db *sqlx.DB) QuestionRepository {
 
 func (qr *questionRepository) GetCategories() ([]models.Category, error) {
 	var categories []models.Category
-	err := qr.db.Select(&categories, "SELECT * FROM categories")
-	if err != nil {
-		return nil, ErrorGetCategories
+	if err := qr.db.Select(&categories, "SELECT * FROM categories"); err != nil {
+		return nil, err
 	}
 	return categories, nil
 }
@@ -67,15 +44,13 @@ func (qr *questionRepository) GetCategoryDetail(categoryId uint) ([]models.Categ
 			`, categoryId,
 	)
 	if err != nil {
-		return nil, ErrorGetCategoryDetail
+		return nil, err
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		var cdr models.CategoryDetailResponse
-		err := rows.StructScan(&cdr)
-		if err != nil {
-			return nil, ErrorGetCategoryDetail
+		if err := rows.StructScan(&cdr); err != nil {
+			return nil, err
 		}
 		categoryDetailResponse = append(categoryDetailResponse, cdr)
 	}
@@ -94,15 +69,13 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestio
 			`, categoryId, freeQuestionIds[0], freeQuestionIds[1], freeQuestionIds[2],
 	)
 	if err != nil {
-		return nil, ErrorGetCategoryDetail
+		return nil, err
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		var cdr models.CategoryDetailResponse
-		err := rows.StructScan(&cdr)
-		if err != nil {
-			return nil, ErrorGetCategoryDetail
+		if err := rows.StructScan(&cdr); err != nil {
+			return nil, err
 		}
 		categoryDetailResponse = append(categoryDetailResponse, cdr)
 	}
@@ -110,62 +83,52 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestio
 }
 
 func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error) {
-
 	var questionTranslation models.Translation
 	var answersTranslation []models.Translation
 	var response models.QuestionDetailResponse
 
-	err := qr.db.Get(
+	if err := qr.db.Get(
 		&response, `
 			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name, EXISTS(SELECT 1 FROM bookmarks WHERE question_id = $1 AND user_id = $2) AS is_bookmarked  
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
 			WHERE q.id = $1
 			`, questionId, userId,
-	)
-
-	if err != nil {
-		return models.QuestionDetailResponse{}, ErrorGetQuestionDetail
+	); err != nil {
+		return models.QuestionDetailResponse{}, err
 	}
-
 	response.FileURL = fmt.Sprintf("%s/image/%s", apiBaseUrl, response.Filename)
 
 	var answers []models.Answer
-	err = qr.db.Select(
+	if err := qr.db.Select(
 		&answers, `
 				SELECT id, question_id, text, is_correct, created_at, updated_at, deleted_at
 				FROM answers
 				WHERE question_id = $1
 				`, questionId,
-	)
-	if err != nil {
-		return models.QuestionDetailResponse{}, ErrorGetQuestionAnswers
+	); err != nil {
+		return models.QuestionDetailResponse{}, err
 	}
-
 	response.Answers = answers
 
 	if lang != "" {
-		err = qr.db.Get(
+		if err := qr.db.Get(
 			&questionTranslation, `
 			SELECT * from translations
 			WHERE refer_id = $1 AND type = $2 AND lang = $3
 		`, questionId, models.QuestionType, lang,
-		)
-		if err != nil {
-			return models.QuestionDetailResponse{}, ErrorGetAnswersTranslations
+		); err != nil {
+			return models.QuestionDetailResponse{}, err
 		}
-		err = qr.db.Select(
+		if err := qr.db.Select(
 			&answersTranslation, `
 			SELECT * from translations
 			WHERE refer_id IN ($1, $2, $3, $4) AND type = $5 AND lang = $6
 		`, answers[0].ID, answers[1].ID, answers[2].ID, answers[3].ID, models.AnswerType, lang,
-		)
-		if err != nil {
-			return models.QuestionDetailResponse{}, ErrorGetAnswersTranslations
+		); err != nil {
+			return models.QuestionDetailResponse{}, err
 		}
-
 		response.Question = questionTranslation.Translation
-
 		for i, answer := range response.Answers {
 			for _, translation := range answersTranslation {
 				if answer.ID == translation.ReferID {
@@ -174,7 +137,6 @@ func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang st
 			}
 		}
 	}
-
 	return response, nil
 }
 
@@ -186,19 +148,18 @@ func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (ui
 
 	if err != nil && err.Error() == "sql: no rows in result set" {
 		var bookmarkId uint
-		err := qr.db.QueryRow(
+		if err := qr.db.QueryRow(
 			`
 			INSERT INTO bookmarks (user_id, question_id) VALUES ($1, $2) RETURNING id
 			`, userId, questionId,
-		).Scan(&bookmarkId)
-		if err != nil {
-			return 0, ErrorBookmarkQuestion
+		).Scan(&bookmarkId); err != nil {
+			return 0, err
 		}
 		return bookmarkId, nil
 	} else {
 		_, err := qr.db.Exec("DELETE FROM bookmarks WHERE user_id = $1 AND question_id = $2", userId, questionId)
 		if err != nil {
-			return 0, ErrorBookmarkQuestion
+			return 0, err
 		}
 	}
 	return 0, nil
@@ -206,39 +167,15 @@ func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (ui
 
 func (qr *questionRepository) GetBookmarks(userId uint) ([]models.BookmarkResponse, error) {
 	var bookmarks []models.BookmarkResponse
-	err := qr.db.Select(
+	if err := qr.db.Select(
 		&bookmarks, `
 				SELECT q.question_number, q.id AS question_id FROM bookmarks AS b
 				JOIN questions AS q ON b.question_id = q.id
 				WHERE b.user_id = $1
 				ORDER BY q.id
 				`, userId,
-	)
-	if err != nil {
-		return nil, ErrorGetBookmarks
+	); err != nil {
+		return nil, err
 	}
 	return bookmarks, nil
-}
-
-func (qr *questionRepository) ErrorMissingCategoryId() error {
-	return ErrorMissingCategoryId
-}
-
-func (qr *questionRepository) ErrorUnsupportedLanguage() error {
-	return ErrorUnsupportedLanguage
-}
-func (qr *questionRepository) ErrorMissingQuestionId() error {
-	return ErrorMissingQuestionId
-}
-
-func (qr *questionRepository) ErrorMissingFilename() error {
-	return ErrorMissingFilename
-}
-
-func (qr *questionRepository) ErrorFileNotFound() error {
-	return ErrorFileNotFound
-}
-
-func (qr *questionRepository) ErrGetBookmarks() error {
-	return ErrorGetBookmarks
 }

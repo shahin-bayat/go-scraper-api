@@ -54,8 +54,8 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 
 					r.Route(
 						"/subscription", func(r chi.Router) {
-							r.Get("/", h.GetSubscriptions)
-							r.Get("/{subscriptionId}", h.GetSubscriptionDetail)
+							r.Get("/", utils.Make(h.GetSubscriptions))
+							r.Get("/{subscriptionId}", utils.Make(h.GetSubscriptionDetail))
 						},
 					)
 

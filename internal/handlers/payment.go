@@ -4,16 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/shahin-bayat/scraper-api/internal/middlewares"
-	"github.com/stripe/stripe-go/customer"
-	"net/http"
-	"strconv"
-	"strings"
-
 	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
 	"github.com/stripe/stripe-go"
+	"github.com/stripe/stripe-go/customer"
 	"github.com/stripe/stripe-go/paymentintent"
 	"github.com/stripe/stripe-go/webhook"
+	"net/http"
 )
 
 type paymentConfig struct {
@@ -67,8 +64,7 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) er
 		return utils.InvalidRequestData(validationErrors)
 	}
 
-	intSubscriptionId, _ := strconv.Atoi(strings.TrimSpace(req.SubscriptionID))
-	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(uint(intSubscriptionId))
+	subscription, err := h.store.SubscriptionRepository().GetSubscriptionById(uint(req.SubscriptionID))
 	if err != nil {
 		return err
 	}

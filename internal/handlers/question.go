@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"github.com/shahin-bayat/scraper-api/internal/models"
 	"net/http"
@@ -11,6 +12,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/middlewares"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
+)
+
+var (
+	ErrorMissingCategoryId   = errors.New("category id is required")
+	ErrorUnsupportedLanguage = errors.New("language not supported")
+	ErrorMissingQuestionId   = errors.New("question id is required")
+	ErrorMissingFilename     = errors.New("filename is required")
+	ErrorFileNotFound        = errors.New("file not found")
 )
 
 var (
@@ -35,7 +44,7 @@ func (h *Handler) GetSupportedLanguages(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) error {
 	categoryId := chi.URLParam(r, "categoryId")
 	if categoryId == "" {
-		return utils.NewAPIError(http.StatusUnprocessableEntity, h.store.QuestionRepository().ErrorMissingCategoryId())
+		return utils.NewAPIError(http.StatusUnprocessableEntity, ErrorMissingCategoryId)
 	}
 	intCategoryId, err := strconv.Atoi(categoryId)
 	if err != nil {
@@ -67,12 +76,12 @@ func (h *Handler) GetQuestionDetail(w http.ResponseWriter, r *http.Request) erro
 
 	if lang != "" && !utils.KeyInMap(supportedLanguages, lang) {
 		return utils.NewAPIError(
-			http.StatusUnprocessableEntity, h.store.QuestionRepository().ErrorUnsupportedLanguage(),
+			http.StatusUnprocessableEntity, ErrorUnsupportedLanguage,
 		)
 	}
 
 	if questionId == "" {
-		return utils.NewAPIError(http.StatusUnprocessableEntity, h.store.QuestionRepository().ErrorMissingQuestionId())
+		return utils.NewAPIError(http.StatusUnprocessableEntity, ErrorMissingQuestionId)
 	}
 	intQuestionId, err := strconv.Atoi(questionId)
 	if err != nil {
@@ -146,13 +155,13 @@ func (h *Handler) GetBookmarks(w http.ResponseWriter, r *http.Request) error {
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) error {
 	filename := chi.URLParam(r, "filename")
 	if filename == "" {
-		return utils.NewAPIError(http.StatusUnprocessableEntity, h.store.QuestionRepository().ErrorMissingFilename())
+		return utils.NewAPIError(http.StatusUnprocessableEntity, ErrorMissingFilename)
 	}
 	filenameSanitized := filepath.Clean(filename)
 	filePath := fmt.Sprintf("assets/images/%s", filenameSanitized)
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
-		return utils.NewAPIError(http.StatusNotFound, h.store.QuestionRepository().ErrorFileNotFound())
+		return utils.NewAPIError(http.StatusNotFound, ErrorFileNotFound)
 	} else if err != nil {
 		return err
 	}
