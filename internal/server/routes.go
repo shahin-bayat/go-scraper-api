@@ -61,9 +61,9 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 
 					r.Route(
 						"/payment", func(r chi.Router) {
-							r.Get("/config", h.GetPaymentConfig)
-							r.Post("/webhook", h.HandlePaymentWebhook)
-							r.Post("/intent", h.CreatePaymentIntent)
+							r.Get("/config", utils.Make(h.GetPaymentConfig))
+							r.Post("/webhook", utils.Make(h.HandlePaymentWebhook))
+							r.Post("/intent", utils.Make(h.CreatePaymentIntent))
 						},
 					)
 				},
