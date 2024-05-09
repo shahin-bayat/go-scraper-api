@@ -37,20 +37,20 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 					r.Use(m.Auth)
 					r.Route(
 						"/category", func(r chi.Router) {
-							r.Get("/", h.GetCategories)
-							r.Get("/{categoryId}", h.GetCategoryDetail)
+							r.Get("/", utils.Make(h.GetCategories))
+							r.Get("/{categoryId}", utils.Make(h.GetCategoryDetail))
 						},
 					)
 					r.Route(
 						"/question", func(r chi.Router) {
-							r.Get("/{questionId}", h.GetQuestionDetail)
-							r.Get("/supported-languages", h.GetSupportedLanguages)
-							r.Post("/bookmark", h.ToggleBookmark)
-							r.Get("/bookmark", h.GetBookmarks)
+							r.Get("/{questionId}", utils.Make(h.GetQuestionDetail))
+							r.Get("/supported-languages", utils.Make(h.GetSupportedLanguages))
+							r.Post("/bookmark", utils.Make(h.ToggleBookmark))
+							r.Get("/bookmark", utils.Make(h.GetBookmarks))
 							//r.Post("/user-answer", h.HandleUserAnswer)
 						},
 					)
-					r.Get("/image/{filename}", h.GetImage)
+					r.Get("/image/{filename}", utils.Make(h.GetImage))
 
 					r.Route(
 						"/subscription", func(r chi.Router) {
