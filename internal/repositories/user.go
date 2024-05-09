@@ -147,11 +147,10 @@ func (ur *userRepository) GetUserById(userId uint) (*models.User, error) {
 }
 
 func (ur *userRepository) UpdateUser(userId uint, user *models.UpdateUserRequest) error {
-	_, err := ur.db.Exec(
+	if _, err := ur.db.Exec(
 		"UPDATE users SET stripe_customer_id = $1 WHERE id = $2",
 		user.StripeCustomerID, userId,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 	return nil

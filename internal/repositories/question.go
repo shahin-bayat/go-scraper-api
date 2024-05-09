@@ -157,8 +157,9 @@ func (qr *questionRepository) BookmarkQuestion(questionId uint, userId uint) (ui
 		}
 		return bookmarkId, nil
 	} else {
-		_, err := qr.db.Exec("DELETE FROM bookmarks WHERE user_id = $1 AND question_id = $2", userId, questionId)
-		if err != nil {
+		if _, err := qr.db.Exec(
+			"DELETE FROM bookmarks WHERE user_id = $1 AND question_id = $2", userId, questionId,
+		); err != nil {
 			return 0, err
 		}
 	}
