@@ -8,7 +8,7 @@ import (
 
 type QuestionRepository interface {
 	GetCategories() ([]models.Category, error)
-	GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error)
+	GetCategoryDetail(categoryId uint, questionType string) ([]models.CategoryDetailResponse, error)
 	GetFreeCategoryDetail(categoryId uint, freeQuestionIds [3]uint) ([]models.CategoryDetailResponse, error)
 	GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
 	BookmarkQuestion(questionId uint, userId uint) (uint, error)
@@ -32,17 +32,25 @@ func (qr *questionRepository) GetCategories() ([]models.Category, error) {
 	return categories, nil
 }
 
-func (qr *questionRepository) GetCategoryDetail(categoryId uint) ([]models.CategoryDetailResponse, error) {
+func (qr *questionRepository) GetCategoryDetail(categoryId uint, questionType string) ([]models.CategoryDetailResponse, error) {
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
-	rows, err := qr.db.Queryx(
-		`
-			SELECT q.question_number, q.id 
+	var query string
+	if questionType == "image" {
+		query = `SELECT q.question_number, q.id 
+			FROM category_questions AS cq 
+			JOIN questions AS q ON cq.question_id = q.id
+			JOIN images AS i ON i.question_id = q.id
+			WHERE category_id = $1 AND i.has_image = true
+			ORDER BY q.id`
+	} else {
+		query = `SELECT q.question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 
-			ORDER BY q.id
-			`, categoryId,
-	)
+			ORDER BY q.id`
+	}
+
+	rows, err := qr.db.Queryx(query, categoryId)
 	if err != nil {
 		return nil, err
 	}
