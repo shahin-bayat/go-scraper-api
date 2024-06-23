@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	ErrorMissingCategoryId   = errors.New("category id is required")
-	ErrorUnsupportedLanguage = errors.New("language not supported")
-	ErrorMissingQuestionId   = errors.New("question id is required")
-	ErrorMissingFilename     = errors.New("filename is required")
-	ErrorFileNotFound        = errors.New("file not found")
+	ErrorMissingCategoryId       = errors.New("category id is required")
+	ErrorUnsupportedLanguage     = errors.New("language not supported")
+	ErrorMissingQuestionId       = errors.New("question id is required")
+	ErrorMissingFilename         = errors.New("filename is required")
+	ErrorFileNotFound            = errors.New("file not found")
+	ErrorUnsupportedQuestionType = errors.New("unsupported question type")
 )
 
 var (
@@ -43,6 +44,13 @@ func (h *Handler) GetSupportedLanguages(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) error {
 	categoryId := chi.URLParam(r, "categoryId")
+	questionType := r.URL.Query().Get("type")
+	if questionType != "" && questionType != "image" {
+		return utils.NewAPIError(
+			http.StatusUnprocessableEntity, ErrorUnsupportedQuestionType,
+		)
+	}
+
 	if categoryId == "" {
 		return utils.NewAPIError(http.StatusUnprocessableEntity, ErrorMissingCategoryId)
 	}
@@ -51,7 +59,7 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) erro
 		return utils.NewAPIError(http.StatusUnprocessableEntity, err)
 	}
 
-	_, err = middlewares.GetUserIdFromContext(r.Context())
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
 	if err != nil {
 		category, err := h.store.QuestionRepository().GetFreeCategoryDetail(uint(intCategoryId), freeQuestionIds)
 		if err != nil {
@@ -60,8 +68,20 @@ func (h *Handler) GetCategoryDetail(w http.ResponseWriter, r *http.Request) erro
 		utils.WriteJSON(w, http.StatusOK, category, nil)
 		return nil
 	}
+	if questionType == "image" && userId == 0 {
+		return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+		//TODO: check subscription status for free questions: && subscription was valid
+	} else if questionType == "image" && userId != 0 {
+		category, err := h.store.QuestionRepository().GetCategoryDetail(uint(intCategoryId), questionType)
+		if err != nil {
+			return err
+		}
 
-	category, err := h.store.QuestionRepository().GetCategoryDetail(uint(intCategoryId))
+		utils.WriteJSON(w, http.StatusOK, category, nil)
+		return nil
+	}
+
+	category, err := h.store.QuestionRepository().GetCategoryDetail(uint(intCategoryId), "")
 	if err != nil {
 		return err
 	}
