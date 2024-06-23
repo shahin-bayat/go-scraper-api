@@ -95,7 +95,7 @@ func (as *authService) ValidateToken(ctx context.Context, token *oauth2.Token) (
 		return &models.GoogleUserInfo{}, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return &models.GoogleUserInfo{}, err
+		return &models.GoogleUserInfo{}, ErrorUnauthorized
 	}
 	defer resp.Body.Close()
 
