@@ -16,12 +16,10 @@ import (
 var (
 	ErrorInvalidToken               = errors.New("invalid token")
 	ErrorDecodeUserInfo             = errors.New("failed to decode user info")
-	ErrorCreateTokenSource          = errors.New("failed to create token source")
 	ErrorMissingAuthorizationHeader = errors.New("required authorization header is missing")
 	ErrorRevokeToken                = errors.New("failed to revoke token")
 	ErrorExchangeToken              = errors.New("failed to exchange token")
 	ErrorMissingToken               = errors.New("token is missing")
-	ErrorGenerateAuthState          = errors.New("failed to generate auth state")
 	ErrorAuthStateMissmatch         = errors.New("auth state missmatch")
 	ErrorUnauthorized               = errors.New("user is not authorized")
 )
@@ -36,7 +34,6 @@ type AuthService interface {
 	ErrorInvalidToken() error
 	ErrorDecodeUserInfo() error
 	ErrorMissingAuthorizationHeader() error
-	ErrorGenerateAuthState() error
 	ErrorAuthStateMissmatch() error
 	ErrorUnauthorized() error
 }
@@ -68,7 +65,10 @@ func (as *authService) GetAuthCodeUrl(state, verifier string) string {
 }
 
 func (as *authService) ExchangeToken(ctx context.Context, code, verifier string) (*oauth2.Token, error) {
-	token, err := as.oauth2.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier), oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
+	token, err := as.oauth2.Exchange(
+		ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier), oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("prompt", "consent"),
+	)
 	if err != nil {
 		return nil, ErrorExchangeToken
 	}
@@ -79,7 +79,7 @@ func (as *authService) Token(ctx context.Context, token *oauth2.Token) (*oauth2.
 	tokenSrc := as.oauth2.TokenSource(ctx, token)
 	token, err := oauth2.ReuseTokenSource(token, tokenSrc).Token()
 	if err != nil {
-		return nil, ErrorCreateTokenSource
+		return nil, err
 	}
 	return token, nil
 
@@ -92,12 +92,12 @@ func (as *authService) ValidateToken(ctx context.Context, token *oauth2.Token) (
 	client := as.oauth2.Client(ctx, token)
 	resp, err := client.Get(as.userInfoUrl)
 	if err != nil {
-		return &models.GoogleUserInfo{}, ErrorInvalidToken
+		return &models.GoogleUserInfo{}, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return &models.GoogleUserInfo{}, ErrorUnauthorized
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return &models.GoogleUserInfo{}, ErrorInvalidToken
-	}
 
 	userInfo := &models.GoogleUserInfo{}
 	err = utils.DecodeResponseBody(resp.Body, &userInfo)
@@ -135,10 +135,6 @@ func (as *authService) ErrorDecodeUserInfo() error {
 
 func (as *authService) ErrorMissingAuthorizationHeader() error {
 	return ErrorMissingAuthorizationHeader
-}
-
-func (as *authService) ErrorGenerateAuthState() error {
-	return ErrorGenerateAuthState
 }
 
 func (as *authService) ErrorAuthStateMissmatch() error {

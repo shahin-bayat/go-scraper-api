@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/shahin-bayat/scraper-api/internal/models"
 	"github.com/shahin-bayat/scraper-api/internal/utils"
@@ -8,34 +9,38 @@ import (
 	"strconv"
 )
 
-func (h *Handler) GetSubscriptions(w http.ResponseWriter, r *http.Request) {
+var (
+	ErrorMissingSubscriptionId = errors.New("subscriptionRepository id is required")
+)
+
+func (h *Handler) GetSubscriptions(w http.ResponseWriter, r *http.Request) error {
 	subscriptions, err := h.store.SubscriptionRepository().GetSubscriptions()
-	var response models.GetSubscriptionsResponse
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
+	var response models.GetSubscriptionsResponse
 	response.Subscriptions = subscriptions
 	response.Features = []string{"Ad-Free Experience", "Access to All Questions", "Bookmark Favorite Questions", "Practice Failed Questions", "Practice Challenging Questions", "Train with Image-Based Questions"}
 
 	utils.WriteJSON(w, http.StatusOK, response, nil)
+	return nil
 }
 
-func (h *Handler) GetSubscriptionDetail(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetSubscriptionDetail(w http.ResponseWriter, r *http.Request) error {
 	subscriptionId := chi.URLParam(r, "subscriptionId")
 	if subscriptionId == "" {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, h.store.SubscriptionRepository().ErrorMissingSubscriptionId())
-		return
+		return utils.NewAPIError(
+			http.StatusUnprocessableEntity, ErrorMissingSubscriptionId,
+		)
 	}
 	intSubscriptionId, err := strconv.Atoi(subscriptionId)
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusBadRequest, err)
-		return
+		return utils.NewAPIError(http.StatusUnprocessableEntity, err)
 	}
 	subscription, err := h.store.SubscriptionRepository().GetSubscriptionDetail(uint(intSubscriptionId))
 	if err != nil {
-		utils.WriteErrorJSON(w, http.StatusNotFound, err)
-		return
+		return err
 	}
 	utils.WriteJSON(w, http.StatusOK, subscription, nil)
+	return nil
 }
