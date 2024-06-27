@@ -1,9 +1,12 @@
 package repositories
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/shahin-bayat/scraper-api/internal/models"
+	"time"
 )
 
 type QuestionRepository interface {
@@ -13,6 +16,8 @@ type QuestionRepository interface {
 	GetQuestionDetail(questionId, userId uint, lang string, apiBaseUrl string) (models.QuestionDetailResponse, error)
 	BookmarkQuestion(questionId uint, userId uint) (uint, error)
 	GetBookmarks(userId uint) ([]models.BookmarkResponse, error)
+	GetFailedQuestions(userId uint) ([]models.FailedQuestionResponse, error)
+	AddOrRemoveFailedQuestion(userId, questionId uint) error
 }
 type questionRepository struct {
 	db *sqlx.DB
@@ -36,14 +41,14 @@ func (qr *questionRepository) GetCategoryDetail(categoryId uint, questionType st
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	var query string
 	if questionType == "image" {
-		query = `SELECT q.question_number, q.id 
+		query = `SELECT ROW_NUMBER() OVER (ORDER BY q.id) AS question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id
 			JOIN images AS i ON i.question_id = q.id
 			WHERE category_id = $1 AND i.has_image = true
 			ORDER BY q.id`
 	} else {
-		query = `SELECT q.question_number, q.id 
+		query = `SELECT ROW_NUMBER() OVER (ORDER BY q.id) AS question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 
@@ -69,7 +74,7 @@ func (qr *questionRepository) GetFreeCategoryDetail(categoryId uint, freeQuestio
 	var categoryDetailResponse = make([]models.CategoryDetailResponse, 0)
 	rows, err := qr.db.Queryx(
 		`
-			SELECT q.question_number, q.id 
+			SELECT ROW_NUMBER() OVER (ORDER BY q.id) AS question_number, q.id 
 			FROM category_questions AS cq 
 			JOIN questions AS q ON cq.question_id = q.id 
 			WHERE category_id = $1 AND q.id IN ($2, $3, $4)
@@ -97,7 +102,7 @@ func (qr *questionRepository) GetQuestionDetail(questionId, userId uint, lang st
 
 	if err := qr.db.Get(
 		&response, `
-			SELECT q.question_number, i.extracted_text, i.has_image, i.file_name, EXISTS(SELECT 1 FROM bookmarks WHERE question_id = $1 AND user_id = $2) AS is_bookmarked  
+			SELECT i.extracted_text, i.has_image, i.file_name, EXISTS(SELECT 1 FROM bookmarks WHERE question_id = $1 AND user_id = $2) AS is_bookmarked  
 			FROM questions AS q
 			JOIN images AS i ON i.question_id = q.id
 			WHERE q.id = $1
@@ -178,7 +183,7 @@ func (qr *questionRepository) GetBookmarks(userId uint) ([]models.BookmarkRespon
 	var bookmarks []models.BookmarkResponse
 	if err := qr.db.Select(
 		&bookmarks, `
-				SELECT q.question_number, q.id AS question_id FROM bookmarks AS b
+				SELECT ROW_NUMBER() OVER (ORDER BY q.id) AS question_number, q.id AS question_id FROM bookmarks AS b
 				JOIN questions AS q ON b.question_id = q.id
 				WHERE b.user_id = $1
 				ORDER BY q.id
@@ -187,4 +192,65 @@ func (qr *questionRepository) GetBookmarks(userId uint) ([]models.BookmarkRespon
 		return nil, err
 	}
 	return bookmarks, nil
+}
+
+func (qr *questionRepository) GetFailedQuestions(userId uint) ([]models.FailedQuestionResponse, error) {
+	var failedQuestions []models.FailedQuestionResponse
+	if err := qr.db.Select(
+		&failedQuestions, `
+				SELECT fq.question_id, ROW_NUMBER() OVER (ORDER BY fq.id) AS question_number 
+				FROM failed_questions AS fq
+         		WHERE user_id = $1 AND deleted_at IS NULL
+         		`, userId,
+	); err != nil {
+		return nil, err
+	}
+	return failedQuestions, nil
+}
+
+func (qr *questionRepository) AddOrRemoveFailedQuestion(userId, questionId uint) error {
+	// scenario 1: user has no record in failed_questions table --> create a record with deleted_at = null
+	// scenario 2: user has already a failed question in that table with deleted_at=date, --> restore it: make it null
+	// scenario 3: user has already a failed question in that table with deleted_at=null --> soft delete it (fill the date)
+
+	var failedQuestion models.FailedQuestion
+	err := qr.db.Get(
+		&failedQuestion,
+		"SELECT * FROM failed_questions WHERE user_id = $1 AND question_id = $2",
+		userId, questionId,
+	)
+
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		// scenario 1: No record found, create a new record with deleted_at = NULL
+		if _, err := qr.db.Exec(
+			"INSERT INTO failed_questions (user_id, question_id, created_at, deleted_at) VALUES ($1, $2, $3, NULL)",
+			userId, questionId, time.Now(),
+		); err != nil {
+			return err
+		}
+	case err != nil:
+		return err
+	default:
+		// Record found
+		if failedQuestion.DeletedAt != nil {
+			// scenario 2: Record exists with deleted_at IS NOT NULL, restore it (set deleted_at to NULL)
+			if _, err := qr.db.Exec(
+				"UPDATE failed_questions SET deleted_at = NULL WHERE user_id = $1 AND question_id = $2",
+				userId, questionId,
+			); err != nil {
+				return err
+			}
+		} else {
+			// scenario 3: Record exists with deleted_at IS NULL, soft delete it (set deleted_at to current time)
+			if _, err := qr.db.Exec(
+				"UPDATE failed_questions SET deleted_at = $1 WHERE user_id = $2 AND question_id = $3",
+				time.Now(), userId, questionId,
+			); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

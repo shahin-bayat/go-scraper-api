@@ -47,7 +47,12 @@ func RegisterRoutes(store store.Store, services *services.Services, appConfig *c
 							r.Get("/supported-languages", utils.Make(h.GetSupportedLanguages))
 							r.Post("/bookmark", utils.Make(h.ToggleBookmark))
 							r.Get("/bookmark", utils.Make(h.GetBookmarks))
-							//r.Post("/user-answer", h.HandleUserAnswer)
+							r.Route(
+								"/failed", func(r chi.Router) {
+									r.Get("/", utils.Make(h.GetFailedQuestions))
+									r.Post("/{questionId}", utils.Make(h.AddOrRemoveFailedQuestion))
+								},
+							)
 						},
 					)
 					r.Get("/image/{filename}", utils.Make(h.GetImage))

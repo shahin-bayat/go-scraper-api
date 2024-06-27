@@ -38,13 +38,12 @@ type CategoryDetailResponse struct {
 }
 
 type QuestionDetailResponse struct {
-	QuestionNumber string   `json:"question_number" db:"question_number"`
-	Question       string   `json:"question" db:"extracted_text"`
-	HasImage       bool     `json:"has_image" db:"has_image"`
-	Filename       string   `json:"-" db:"file_name"`
-	FileURL        string   `json:"file_url"`
-	Answers        []Answer `json:"answers"`
-	IsBookmarked   bool     `json:"is_bookmarked" db:"is_bookmarked"`
+	Question     string   `json:"question" db:"extracted_text"`
+	HasImage     bool     `json:"has_image" db:"has_image"`
+	Filename     string   `json:"-" db:"file_name"`
+	FileURL      string   `json:"file_url"`
+	Answers      []Answer `json:"answers"`
+	IsBookmarked bool     `json:"is_bookmarked" db:"is_bookmarked"`
 }
 
 type Bookmark struct {
@@ -69,4 +68,17 @@ func (r *BookmarkRequest) Validate() map[string]string {
 		errors["question_id"] = "question_id is required"
 	}
 	return errors
+}
+
+type FailedQuestion struct {
+	ID         uint       `json:"id" db:"id"`
+	UserID     uint       `json:"user_id" db:"user_id"`
+	QuestionID uint       `json:"question_id" db:"question_id"`
+	CreatedAt  time.Time  `json:"-" db:"created_at"`
+	DeletedAt  *time.Time `json:"-" db:"deleted_at"`
+}
+
+type FailedQuestionResponse struct {
+	QuestionNumber string `json:"question_number" db:"question_number"`
+	QuestionID     uint   `json:"question_id" db:"question_id"`
 }

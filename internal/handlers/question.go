@@ -189,3 +189,37 @@ func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) error {
 	http.ServeFile(w, r, fmt.Sprintf("assets/images/%s", filename))
 	return nil
 }
+
+func (h *Handler) GetFailedQuestions(w http.ResponseWriter, r *http.Request) error {
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+	}
+
+	failedQuestions, err := h.store.QuestionRepository().GetFailedQuestions(userId)
+	if err != nil {
+		return err
+	}
+	utils.WriteJSON(w, http.StatusOK, failedQuestions, nil)
+	return nil
+}
+
+func (h *Handler) AddOrRemoveFailedQuestion(w http.ResponseWriter, r *http.Request) error {
+	questionId := chi.URLParam(r, "questionId")
+	if questionId == "" {
+		return utils.NewAPIError(http.StatusUnprocessableEntity, ErrorMissingQuestionId)
+	}
+	intQuestionId, err := strconv.Atoi(questionId)
+	if err != nil {
+		return utils.NewAPIError(http.StatusUnprocessableEntity, err)
+	}
+	userId, err := middlewares.GetUserIdFromContext(r.Context())
+	if err != nil {
+		return utils.NewAPIError(http.StatusUnauthorized, h.services.AuthService.ErrorUnauthorized())
+	}
+	if err := h.store.QuestionRepository().AddOrRemoveFailedQuestion(userId, uint(intQuestionId)); err != nil {
+		return err
+	}
+	utils.WriteJSON(w, http.StatusNoContent, nil, nil)
+	return nil
+}
